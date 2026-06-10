@@ -1,0 +1,612 @@
+{
+  "common": {
+    "siteName": "Katalina",
+    "tagline": "Joyería artesanal mexicana"
+  },
+
+  "nav": {
+    "home": "Inicio",
+    "shop": "Tienda",
+    "earrings": "Aretes",
+    "necklaces": "Collares",
+    "bracelets": "Pulseras",
+    "chokers": "Gargantillas",
+    "about": "Quiénes somos",
+    "contact": "Contacto",
+    "faq": "Preguntas frecuentes",
+    "policies": "Políticas",
+    "privacy": "Privacidad",
+    "terms": "Términos y condiciones",
+    "openMenu": "Abrir menú",
+    "closeMenu": "Cerrar menú",
+    "myAccount": "Mi cuenta",
+    "search": "Buscar"
+  },
+
+  "language": {
+    "switchTo": "Cambiar idioma",
+    "currentLanguage": "Idioma actual",
+    "spanish": "Español",
+    "english": "English"
+  },
+
+  "header": {
+    "cartLabel": "Carrito",
+    "wishlistLabel": "Lista de deseos",
+    "loginLabel": "Iniciar sesión",
+    "userMenuLabel": "Menú de usuario"
+  },
+
+  "footer": {
+    "tagline": "Joyería artesanal hecha con tiempo en Mazatlán, Sinaloa.",
+    "sections": {
+      "shop": "Tienda",
+      "company": "Empresa",
+      "support": "Soporte",
+      "legal": "Legal",
+      "follow": "Síguenos"
+    },
+    "newsletter": {
+      "title": "Suscríbete a nuestro boletín",
+      "description": "Recibe las nuevas colecciones, ofertas exclusivas y la historia detrás de cada pieza.",
+      "emailPlaceholder": "Tu email",
+      "submitButton": "Suscribirme",
+      "successMessage": "¡Gracias por suscribirte!",
+      "successDescription": "Pronto recibirás nuestras novedades."
+    },
+    "copyright": "© {year} {siteName}. Todos los derechos reservados.",
+    "madeWith": "Hecho con cuidado en Mazatlán, Sinaloa"
+  },
+
+  "userMenu": {
+    "greeting": "Hola, {firstName}",
+    "myProfile": "Mi perfil",
+    "myWishlist": "Mi wishlist",
+    "myOrders": "Mis pedidos",
+    "myReservations": "Mis apartados",
+    "logout": "Cerrar sesión"
+  },
+
+  "legal": {
+    "tableOfContents": "En esta página",
+    "lastUpdated": "Última actualización:"
+  },
+
+  "accountSidebar": {
+    "greeting": "Hola, {firstName}",
+    "myProfile": "Mi perfil",
+    "myWishlist": "Mi wishlist",
+    "myReservations": "Mis apartados",
+    "myOrders": "Mis pedidos",
+    "logout": "Cerrar sesión",
+    "logoutShort": "Salir",
+    "toast": {
+      "loggedOutTitle": "Sesión cerrada",
+      "loggedOutDescription": "Esperamos verte de vuelta pronto"
+    }
+  },
+
+  "breadcrumb": {
+    "home": "Inicio",
+    "ariaLabel": "Migajas de pan"
+  },
+
+  "wishlistPage": {
+    "title": "Mi wishlist",
+    "subtitleEmpty": "Aún no has guardado productos",
+    "subtitleSingular": "{count} producto guardado",
+    "subtitlePlural": "{count} productos guardados",
+    "empty": {
+      "title": "Tu wishlist está vacía",
+      "description": "Guarda los productos que te gusten para tenerlos a mano cuando estés lista para comprar.",
+      "ctaButton": "Explorar productos"
+    }
+  },
+
+  "myOrders": {
+    "title": "Mis pedidos",
+    "subtitleWithOrders": "Historial de tus compras recientes",
+    "subtitleEmpty": "Aún no tienes pedidos",
+    "card": {
+      "orderEyebrow": "Pedido",
+      "statusConfirmed": "Confirmado",
+      "productsSingular": "producto",
+      "productsPlural": "productos",
+      "moreSingular": "y {count} producto más",
+      "morePlural": "y {count} productos más",
+      "totalLabel": "Total",
+      "viewDetailButton": "Ver detalle"
+    },
+    "empty": {
+      "title": "Aún no tienes pedidos",
+      "description": "Cuando hagas tu primera compra, aparecerá aquí. Mientras tanto, te invitamos a explorar nuestra colección.",
+      "ctaButton": "Ver productos"
+    }
+  },
+
+  "profile": {
+    "title": "Mi perfil",
+    "subtitle": "Gestiona tus datos personales y preferencias",
+    "personalData": {
+      "heading": "Datos personales",
+      "editButton": "Editar",
+      "firstNameLabel": "Nombre",
+      "lastNameLabel": "Apellido",
+      "emailLabel": "Email",
+      "emailNote": "Para cambiar tu email, contáctanos",
+      "memberSinceLabel": "Miembro desde",
+      "saveButton": "Guardar cambios",
+      "cancelButton": "Cancelar",
+      "errorMinChars": "Mínimo 2 caracteres",
+      "toastSuccessTitle": "Datos actualizados",
+      "toastSuccessDescription": "Tus cambios fueron guardados"
+    },
+    "security": {
+      "heading": "Seguridad",
+      "passwordTitle": "Contraseña",
+      "passwordDescription": "Cambia tu contraseña periódicamente para mayor seguridad",
+      "changeButton": "Cambiar",
+      "toastPendingTitle": "Cambio de contraseña pendiente",
+      "toastPendingDescription": "Esta función estará disponible cuando integremos el backend"
+    },
+    "dangerZone": {
+      "heading": "Zona de peligro",
+      "deleteAccountTitle": "Eliminar cuenta",
+      "deleteAccountDescription": "Esta acción no se puede deshacer. Se eliminarán todos tus datos",
+      "deleteButton": "Eliminar",
+      "toastPendingTitle": "Eliminar cuenta pendiente",
+      "toastPendingDescription": "Esta función estará disponible cuando integremos el backend"
+    }
+  },
+
+  "product": {
+    "badges": {
+      "nuevo": "Nuevo",
+      "oferta": "Oferta",
+      "limitado": "Edición limitada",
+      "agotado": "Agotado"
+    },
+    "categories": {
+      "Aretes": "Aretes",
+      "Collares": "Collares",
+      "Pulseras": "Pulseras",
+      "Gargantillas": "Gargantillas"
+    },
+    "materials": {
+      "plata-925": "Plata 925 (Sterling Silver)",
+      "oro-rosa": "Oro rosa sobre plata 925",
+      "acero-quirurgico": "Acero quirúrgico",
+      "piedras-naturales": "Piedras naturales",
+      "cuero": "Cuero genuino",
+      "terciopelo": "Terciopelo"
+    },
+    "materialsShort": {
+      "plata-925": "Plata 925",
+      "oro-rosa": "Oro rosa",
+      "acero-quirurgico": "Acero quirúrgico",
+      "piedras-naturales": "Piedras naturales",
+      "cuero": "Cuero",
+      "terciopelo": "Terciopelo"
+    },
+    "colors": {
+      "dorado": "Dorado",
+      "plateado": "Plateado",
+      "rosa": "Rosa",
+      "negro": "Negro",
+      "multicolor": "Multicolor"
+    },
+    "wishlist": {
+      "add": "Agregar {productName} a la wishlist",
+      "remove": "Quitar {productName} de la wishlist"
+    },
+    "rating": {
+      "ariaLabel": "{rating} de 5 estrellas",
+      "reviewSingular": "reseña",
+      "reviewPlural": "reseñas"
+    },
+    "info": {
+      "freeShipping": "Envío gratis en compras +$1,500",
+      "protectedPurchase": "Compra protegida",
+      "handmade": "Hecho a mano en México"
+    },
+    "accordion": {
+      "description": "Descripción",
+      "details": "Detalles del producto",
+      "care": "Cuidados",
+      "shippingReturns": "Envíos y devoluciones"
+    },
+    "fields": {
+      "material": "Material",
+      "finish": "Acabado",
+      "length": "Largo",
+      "width": "Ancho",
+      "height": "Alto",
+      "weight": "Peso",
+      "notes": "Notas",
+      "cm": "cm",
+      "g": "g"
+    },
+    "shipping": {
+      "title": "Envíos",
+      "lines": [
+        "Envío estándar nacional: 3-5 días hábiles",
+        "Envío express nacional: 1-2 días hábiles",
+        "Envío gratis en compras mayores a $1,500 MXN",
+        "Envíos internacionales disponibles bajo cotización"
+      ]
+    },
+    "returns": {
+      "title": "Devoluciones",
+      "lines": [
+        "30 días para devolución desde la fecha de entrega",
+        "El producto debe estar sin uso y en su empaque original",
+        "Los aretes por higiene NO son retornables",
+        "El costo del envío de retorno corre por cuenta del cliente"
+      ]
+    }
+  },
+
+  "productActions": {
+    "quantityLabel": "Cantidad",
+    "decreaseQuantity": "Reducir cantidad",
+    "increaseQuantity": "Aumentar cantidad",
+    "addToCart": "Agregar al carrito",
+    "outOfStock": "Agotado",
+    "reserve": "Apartar producto",
+    "saveToWishlist": "Guardar en wishlist",
+    "savedToWishlist": "Guardado en wishlist",
+    "toast": {
+      "addedTitle": "Agregado al carrito",
+      "addedDescription": "{quantity} × {productName}",
+      "viewCart": "Ver carrito",
+      "loginRequiredTitle": "Inicia sesión para apartar",
+      "loginRequiredDescription": "Necesitas una cuenta para usar el servicio de apartado",
+      "removedFromWishlist": "Quitado de tu wishlist",
+      "addedToWishlist": "Guardado en tu wishlist"
+    }
+  },
+
+  "reviews": {
+    "header": {
+      "eyebrow": "Lo que dicen las clientas",
+      "title": "Reseñas"
+    },
+    "summary": {
+      "averageAriaLabel": "Promedio: {rating} de 5 estrellas",
+      "totalSingular": "{count} reseña",
+      "totalPlural": "{count} reseñas",
+      "barAriaLabel": "{count} reseñas con {rating} estrellas"
+    },
+    "loginPrompt": {
+      "title": "¿Ya tienes este producto?",
+      "description": "Inicia sesión o crea una cuenta para compartir tu experiencia con otras clientas.",
+      "loginButton": "Iniciar sesión",
+      "registerButton": "Crear cuenta"
+    },
+    "empty": {
+      "title": "Aún no hay reseñas",
+      "descriptionAuthenticated": "Sé la primera en compartir tu experiencia con este producto.",
+      "descriptionGuest": "Sé la primera en compartir tu experiencia. Inicia sesión para escribir una reseña."
+    },
+    "form": {
+      "ariaLabel": "Escribir reseña para {productName}",
+      "title": "Escribe tu reseña",
+      "ratingLabel": "Tu calificación",
+      "ratingGroupAriaLabel": "Calificación de 1 a 5 estrellas",
+      "starSingular": "{count} estrella",
+      "starPlural": "{count} estrellas",
+      "titleLabel": "Título de tu reseña",
+      "titlePlaceholder": "Ej. Hermoso y bien empacado",
+      "titleHint": "Entre 3 y 80 caracteres",
+      "commentLabel": "Tu opinión",
+      "commentPlaceholder": "Cuéntanos sobre tu experiencia con el producto. ¿Qué te gustó? ¿Qué mejorarías?",
+      "commentHint": "Entre 20 y 1000 caracteres",
+      "submitButton": "Publicar reseña",
+      "submitting": "Enviando...",
+      "errors": {
+        "ratingRequired": "Selecciona una calificación",
+        "titleMin": "Mínimo 3 caracteres",
+        "titleMax": "Máximo 80 caracteres",
+        "commentMin": "Mínimo 20 caracteres",
+        "commentMax": "Máximo 1000 caracteres"
+      },
+      "toast": {
+        "successTitle": "¡Gracias por tu reseña!",
+        "successDescription": "Aparecerá pronto en el producto.",
+        "errorTitle": "No pudimos enviar tu reseña",
+        "errorDescription": "Intenta de nuevo en unos momentos."
+      }
+    },
+    "list": {
+      "loadMoreSingular": "Ver {count} reseña más",
+      "loadMorePlural": "Ver {count} reseñas más",
+      "ratingAriaLabel": "{rating} de 5 estrellas",
+      "verifiedPurchase": "Compra verificada",
+      "helpfulSingular": "{count} persona marcó esto como útil",
+      "helpfulPlural": "{count} personas marcaron esto como útil"
+    },
+    "relativeTime": {
+      "justNow": "hace unos segundos"
+    }
+  },
+
+  "catalog": {
+    "categoryEyebrow": "Categoría",
+    "piecesInCollectionSingular": "{count} pieza en colección",
+    "piecesInCollectionPlural": "{count} piezas en colección",
+    "categoryDescriptions": {
+      "Aretes": "Desde minimalistas para uso diario hasta piezas statement para ocasiones especiales. Hechos a mano con plata 925, oro rosa, acero quirúrgico y piedras naturales.",
+      "Collares": "Cadenas finas, dijes con significado y collares statement. Piezas para llevar todos los días o reservar para momentos especiales.",
+      "Pulseras": "Tejidas a mano, pulseras de plata y opciones ajustables. Cómodas para uso diario y perfectas para crear capas.",
+      "Gargantillas": "Diseños cercanos al cuello con materiales nobles. Desde terciopelo hasta plata 925 con piedras naturales."
+    },
+    "metaDescriptions": {
+      "Aretes": "Aretes hechos a mano en plata 925, oro rosa y acero quirúrgico. Diseños desde minimalistas hasta statement para todas las ocasiones.",
+      "Collares": "Collares artesanales en plata 925, oro rosa y piedras naturales. Cadenas, dijes y diseños statement.",
+      "Pulseras": "Pulseras tejidas a mano y de plata 925. Ajustables, cómodas y diseñadas para uso diario.",
+      "Gargantillas": "Gargantillas artesanales en plata, terciopelo y cuero. Piezas únicas hechas a mano en México."
+    },
+    "sortBar": {
+      "productSingular": "producto",
+      "productPlural": "productos",
+      "sortLabel": "Ordenar:",
+      "options": {
+        "nuevos": "Más nuevos",
+        "precio_asc": "Precio menor a mayor",
+        "precio_desc": "Precio mayor a menor",
+        "nombre": "Alfabético (A-Z)"
+      }
+    },
+    "filters": {
+      "title": "Filtros",
+      "clear": "Limpiar",
+      "clearAll": "Limpiar todo",
+      "openFilters": "Abrir filtros",
+      "filtersTrigger": "Filtros",
+      "drawerDescription": "Aplica filtros para refinar los productos mostrados",
+      "viewProductsZero": "Sin productos",
+      "viewProductsSingular": "Ver 1 producto",
+      "viewProductsPlural": "Ver {count} productos",
+      "groups": {
+        "price": "Precio",
+        "material": "Material",
+        "color": "Color",
+        "availability": "Disponibilidad"
+      },
+      "price": {
+        "minPlaceholder": "Min",
+        "maxPlaceholder": "Max",
+        "minAriaLabel": "Precio mínimo",
+        "maxAriaLabel": "Precio máximo",
+        "currency": "En pesos mexicanos"
+      },
+      "availability": {
+        "onlyInStock": "Solo en stock"
+      }
+    },
+    "pagination": {
+      "ariaLabel": "Paginación",
+      "previous": "Página anterior",
+      "next": "Página siguiente",
+      "goToPage": "Ir a página {page}"
+    },
+    "noResults": {
+      "title": "No encontramos piezas",
+      "description": "Prueba ajustando los filtros o limpiándolos para ver toda la colección.",
+      "clearButton": "Limpiar filtros"
+    },
+    "relatedProducts": {
+      "eyebrow": "También te puede gustar",
+      "title": "Productos relacionados"
+    }
+  },
+
+  "reservation": {
+    "modal": {
+      "eyebrow": "Apartar producto",
+      "closeButton": "Cerrar",
+      "rules": {
+        "title": "Cómo funciona",
+        "depositLine": "Pagas un anticipo de <strong>{amount}</strong> ({percentage}% del precio)",
+        "durationLine": "Tienes <strong>{days} días</strong> para completar el pago del resto",
+        "expirationLine": "Si no pagas a tiempo, el apartado expira y <strong>pierdes el anticipo</strong>"
+      },
+      "summary": {
+        "totalPrice": "Precio total",
+        "depositToday": "Anticipo hoy",
+        "remaining": "Restante (a pagar en {days} días)"
+      },
+      "payButton": "Pagar anticipo {amount} con",
+      "payButtonAriaLabel": "Pagar anticipo de {amount} con PayPal",
+      "processing": "Procesando...",
+      "cancelButton": "Cancelar",
+      "toast": {
+        "successTitle": "¡Producto apartado!",
+        "successDescription": "Tienes {days} días para completar el pago",
+        "errorTitle": "No se pudo crear el apartado",
+        "errorDescription": "Intenta de nuevo en unos momentos"
+      }
+    },
+    "page": {
+      "title": "Mis apartados",
+      "subtitleEmpty": "Aún no has apartado ningún producto",
+      "subtitleSingular": "{count} apartado en total",
+      "subtitlePlural": "{count} apartados en total",
+      "tabsAriaLabel": "Filtros de apartados",
+      "tabs": {
+        "active": "Activos",
+        "completed": "Completados",
+        "history": "Historial"
+      },
+      "emptyAll": {
+        "title": "Aún no has apartado nada",
+        "description": "Aparta un producto pagando solo el 20% de anticipo. Tienes 5 días para completar el pago y elegir cómo recibirlo.",
+        "subtext": "Perfecto para piezas que estás considerando comprar.",
+        "ctaButton": "Explorar productos"
+      },
+      "emptyTab": {
+        "active": {
+          "title": "No tienes apartados activos",
+          "description": "Cuando apartes un producto, aparecerá aquí con su tiempo restante."
+        },
+        "completed": {
+          "title": "Sin apartados completados",
+          "description": "Los apartados que pagues completos aparecerán aquí."
+        },
+        "history": {
+          "title": "Historial vacío",
+          "description": "Aquí aparecerán los apartados que expiren o canceles."
+        }
+      }
+    },
+    "card": {
+      "viewProductAriaLabel": "Ver {productName}",
+      "status": {
+        "active": "Activo",
+        "completed": "Completado",
+        "expired": "Expirado",
+        "cancelled": "Cancelado"
+      },
+      "active": {
+        "expiresIn": "Expira en",
+        "depositPaid": "Anticipo pagado",
+        "remaining": "Restante",
+        "completeButton": "Completar pago",
+        "cancelButton": "Cancelar",
+        "confirmCancelText": "¿Cancelar este apartado? Recuerda que el anticipo de <strong>{amount}</strong> no se reembolsa.",
+        "confirmYes": "Sí, cancelar",
+        "confirmNo": "No, mantener",
+        "toastCancelledTitle": "Apartado cancelado",
+        "toastCancelledDescription": "El anticipo no es reembolsable"
+      },
+      "completed": {
+        "totalPaid": "Total pagado",
+        "pickup": "Recoger en tienda",
+        "shipping": "Envío a domicilio",
+        "completedOn": "Completado el {date}"
+      },
+      "terminal": {
+        "expiredMessage": "El apartado expiró sin completar el pago",
+        "cancelledMessage": "Apartado cancelado voluntariamente",
+        "depositLost": "Anticipo perdido"
+      }
+    },
+    "completeModal": {
+      "eyebrow": "Completar pago",
+      "closeButton": "Cerrar",
+      "summary": {
+        "title": "Resumen del pago",
+        "depositPaid": "Anticipo pagado",
+        "payNow": "Por pagar ahora",
+        "productTotal": "Total del producto"
+      },
+      "deliveryQuestion": "¿Cómo lo quieres recibir?",
+      "deliveryAriaLabel": "Método de entrega",
+      "pickup": {
+        "label": "Recoger en tienda",
+        "description": "Sin costo · Cuando esté listo te avisamos"
+      },
+      "shipping": {
+        "label": "Envío a domicilio",
+        "description": "Costo del envío incluido · 3-5 días hábiles"
+      },
+      "payButton": "Pagar {amount} con",
+      "payButtonAriaLabel": "Pagar {amount} con PayPal",
+      "processing": "Procesando...",
+      "cancelButton": "Cancelar",
+      "toast": {
+        "successTitle": "¡Pago completado!",
+        "successDescriptionPickup": "Te avisaremos cuando esté listo para recoger",
+        "successDescriptionShipping": "Te enviaremos un email con el seguimiento del envío"
+      }
+    }
+  },
+
+  "cart": {
+    "item": {
+      "viewDetails": "Ver detalles de {productName}",
+      "removeFromCart": "Eliminar {productName} del carrito",
+      "decreaseQuantity": "Reducir cantidad",
+      "increaseQuantity": "Aumentar cantidad",
+      "pricePerUnit": "c/u"
+    },
+    "toast": {
+      "removed": "Producto eliminado",
+      "restored": "Restaurado",
+      "undo": "Deshacer"
+    }
+  },
+
+  "checkout": {
+    "page": {
+      "breadcrumbCart": "Carrito",
+      "breadcrumbCheckout": "Checkout",
+      "title": "Finalizar compra",
+      "errorToast": {
+        "title": "Revisa los campos marcados",
+        "description": "Hay errores en el formulario"
+      }
+    },
+    "summary": {
+      "title": "Resumen del pedido",
+      "quantity": "Cantidad:",
+      "subtotal": "Subtotal",
+      "total": "Total",
+      "payButton": "Pagar con",
+      "payButtonAriaLabel": "Pagar con PayPal",
+      "processing": "Procesando...",
+      "securityNotice": "Tu pago se procesa de forma segura. No almacenamos información de tu tarjeta."
+    },
+    "confirmation": {
+      "successHeader": {
+        "title": "¡Tu pedido está confirmado!",
+        "emailSent": "Te enviamos los detalles a",
+        "orderNumber": "Número de orden"
+      },
+      "order": {
+        "title": "Tu pedido",
+        "quantityLabel": "Cantidad:",
+        "subtotal": "Subtotal",
+        "totalPaid": "Total pagado"
+      },
+      "shipping": {
+        "title": "Envío a",
+        "phoneLabel": "Tel:",
+        "notesLabel": "Notas"
+      },
+      "estimatedTime": {
+        "title": "Tiempo estimado",
+        "emailFollowUp": "Te enviaremos un email cuando tu pedido sea despachado"
+      },
+      "minimalNotice": "Te enviamos un email con todos los detalles de tu pedido. Si tienes alguna pregunta, contáctanos referenciando el número de orden.",
+      "invalidOrder": {
+        "title": "Hmm, no encontramos tu pedido",
+        "description": "Esta URL no corresponde a un pedido válido. Si acabas de hacer una compra, revisa tu email de confirmación.",
+        "backHome": "Volver al inicio"
+      },
+      "cta": {
+        "continueShopping": "Seguir comprando",
+        "viewOrders": "Ver mis pedidos"
+      },
+      "guestAccount": {
+        "title": "Crea tu cuenta con un click",
+        "description": "Ya tenemos tus datos del pedido. Solo elige una contraseña y podrás ver tus pedidos, guardar tu dirección y comprar más rápido la próxima vez.",
+        "createButton": "Crear cuenta",
+        "emailLabel": "Email",
+        "passwordLabel": "Crea una contraseña",
+        "showPassword": "Mostrar contraseña",
+        "hidePassword": "Ocultar contraseña",
+        "submitButton": "Crear cuenta",
+        "submitting": "Creando...",
+        "cancelButton": "No, gracias",
+        "successTitle": "¡Cuenta creada exitosamente!",
+        "successDescription": "Ahora puedes ver tus pedidos en cualquier momento desde tu cuenta",
+        "toastSuccess": "¡Cuenta creada!",
+        "toastSuccessDescription": "Bienvenida {firstName}",
+        "errorEmpty": "Por favor ingresa una contraseña",
+        "errorRequirements": "La contraseña no cumple los requisitos",
+        "errorGeneric": "Error al crear cuenta"
+      }
+    }
+  }
+}

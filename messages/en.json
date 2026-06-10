@@ -1,0 +1,612 @@
+{
+  "common": {
+    "siteName": "Katalina",
+    "tagline": "Mexican handcrafted jewelry"
+  },
+
+  "nav": {
+    "home": "Home",
+    "shop": "Shop",
+    "earrings": "Earrings",
+    "necklaces": "Necklaces",
+    "bracelets": "Bracelets",
+    "chokers": "Chokers",
+    "about": "About us",
+    "contact": "Contact",
+    "faq": "FAQ",
+    "policies": "Policies",
+    "privacy": "Privacy",
+    "terms": "Terms & Conditions",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "myAccount": "My account",
+    "search": "Search"
+  },
+
+  "language": {
+    "switchTo": "Change language",
+    "currentLanguage": "Current language",
+    "spanish": "Español",
+    "english": "English"
+  },
+
+  "header": {
+    "cartLabel": "Cart",
+    "wishlistLabel": "Wishlist",
+    "loginLabel": "Sign in",
+    "userMenuLabel": "User menu"
+  },
+
+  "footer": {
+    "tagline": "Handcrafted jewelry made with time in Mazatlán, Sinaloa.",
+    "sections": {
+      "shop": "Shop",
+      "company": "Company",
+      "support": "Support",
+      "legal": "Legal",
+      "follow": "Follow us"
+    },
+    "newsletter": {
+      "title": "Subscribe to our newsletter",
+      "description": "Get new collections, exclusive offers, and the story behind every piece.",
+      "emailPlaceholder": "Your email",
+      "submitButton": "Subscribe",
+      "successMessage": "Thanks for subscribing!",
+      "successDescription": "You'll receive our updates soon."
+    },
+    "copyright": "© {year} {siteName}. All rights reserved.",
+    "madeWith": "Made with care in Mazatlán, Sinaloa"
+  },
+
+  "userMenu": {
+    "greeting": "Hi, {firstName}",
+    "myProfile": "My profile",
+    "myWishlist": "My wishlist",
+    "myOrders": "My orders",
+    "myReservations": "My reservations",
+    "logout": "Sign out"
+  },
+
+  "legal": {
+    "tableOfContents": "On this page",
+    "lastUpdated": "Last updated:"
+  },
+
+  "accountSidebar": {
+    "greeting": "Hi, {firstName}",
+    "myProfile": "My profile",
+    "myWishlist": "My wishlist",
+    "myReservations": "My reservations",
+    "myOrders": "My orders",
+    "logout": "Sign out",
+    "logoutShort": "Exit",
+    "toast": {
+      "loggedOutTitle": "Signed out",
+      "loggedOutDescription": "We hope to see you back soon"
+    }
+  },
+
+  "breadcrumb": {
+    "home": "Home",
+    "ariaLabel": "Breadcrumb"
+  },
+
+  "wishlistPage": {
+    "title": "My wishlist",
+    "subtitleEmpty": "You haven't saved any products yet",
+    "subtitleSingular": "{count} saved product",
+    "subtitlePlural": "{count} saved products",
+    "empty": {
+      "title": "Your wishlist is empty",
+      "description": "Save the products you like to have them handy when you're ready to buy.",
+      "ctaButton": "Browse products"
+    }
+  },
+
+  "myOrders": {
+    "title": "My orders",
+    "subtitleWithOrders": "History of your recent purchases",
+    "subtitleEmpty": "You have no orders yet",
+    "card": {
+      "orderEyebrow": "Order",
+      "statusConfirmed": "Confirmed",
+      "productsSingular": "product",
+      "productsPlural": "products",
+      "moreSingular": "and {count} more product",
+      "morePlural": "and {count} more products",
+      "totalLabel": "Total",
+      "viewDetailButton": "View detail"
+    },
+    "empty": {
+      "title": "You have no orders yet",
+      "description": "When you make your first purchase, it will appear here. In the meantime, we invite you to browse our collection.",
+      "ctaButton": "View products"
+    }
+  },
+
+  "profile": {
+    "title": "My profile",
+    "subtitle": "Manage your personal data and preferences",
+    "personalData": {
+      "heading": "Personal data",
+      "editButton": "Edit",
+      "firstNameLabel": "First name",
+      "lastNameLabel": "Last name",
+      "emailLabel": "Email",
+      "emailNote": "To change your email, contact us",
+      "memberSinceLabel": "Member since",
+      "saveButton": "Save changes",
+      "cancelButton": "Cancel",
+      "errorMinChars": "Minimum 2 characters",
+      "toastSuccessTitle": "Data updated",
+      "toastSuccessDescription": "Your changes have been saved"
+    },
+    "security": {
+      "heading": "Security",
+      "passwordTitle": "Password",
+      "passwordDescription": "Change your password periodically for better security",
+      "changeButton": "Change",
+      "toastPendingTitle": "Password change pending",
+      "toastPendingDescription": "This feature will be available when we integrate the backend"
+    },
+    "dangerZone": {
+      "heading": "Danger zone",
+      "deleteAccountTitle": "Delete account",
+      "deleteAccountDescription": "This action cannot be undone. All your data will be deleted",
+      "deleteButton": "Delete",
+      "toastPendingTitle": "Delete account pending",
+      "toastPendingDescription": "This feature will be available when we integrate the backend"
+    }
+  },
+
+  "product": {
+    "badges": {
+      "nuevo": "New",
+      "oferta": "Sale",
+      "limitado": "Limited edition",
+      "agotado": "Sold out"
+    },
+    "categories": {
+      "Aretes": "Earrings",
+      "Collares": "Necklaces",
+      "Pulseras": "Bracelets",
+      "Gargantillas": "Chokers"
+    },
+    "materials": {
+      "plata-925": "Sterling Silver 925",
+      "oro-rosa": "Rose gold over sterling silver 925",
+      "acero-quirurgico": "Surgical steel",
+      "piedras-naturales": "Natural stones",
+      "cuero": "Genuine leather",
+      "terciopelo": "Velvet"
+    },
+    "materialsShort": {
+      "plata-925": "Sterling Silver",
+      "oro-rosa": "Rose gold",
+      "acero-quirurgico": "Surgical steel",
+      "piedras-naturales": "Natural stones",
+      "cuero": "Leather",
+      "terciopelo": "Velvet"
+    },
+    "colors": {
+      "dorado": "Gold-tone",
+      "plateado": "Silver-tone",
+      "rosa": "Rose",
+      "negro": "Black",
+      "multicolor": "Multicolor"
+    },
+    "wishlist": {
+      "add": "Add {productName} to wishlist",
+      "remove": "Remove {productName} from wishlist"
+    },
+    "rating": {
+      "ariaLabel": "{rating} out of 5 stars",
+      "reviewSingular": "review",
+      "reviewPlural": "reviews"
+    },
+    "info": {
+      "freeShipping": "Free shipping on orders over $1,500",
+      "protectedPurchase": "Protected purchase",
+      "handmade": "Handmade in Mexico"
+    },
+    "accordion": {
+      "description": "Description",
+      "details": "Product details",
+      "care": "Care",
+      "shippingReturns": "Shipping & returns"
+    },
+    "fields": {
+      "material": "Material",
+      "finish": "Finish",
+      "length": "Length",
+      "width": "Width",
+      "height": "Height",
+      "weight": "Weight",
+      "notes": "Notes",
+      "cm": "cm",
+      "g": "g"
+    },
+    "shipping": {
+      "title": "Shipping",
+      "lines": [
+        "Standard domestic shipping: 3-5 business days",
+        "Express domestic shipping: 1-2 business days",
+        "Free shipping on orders over $1,500 MXN",
+        "International shipping available upon quote"
+      ]
+    },
+    "returns": {
+      "title": "Returns",
+      "lines": [
+        "30 days for return from the delivery date",
+        "The product must be unused and in its original packaging",
+        "Earrings are NOT returnable for hygiene reasons",
+        "Return shipping costs are covered by the customer"
+      ]
+    }
+  },
+
+  "productActions": {
+    "quantityLabel": "Quantity",
+    "decreaseQuantity": "Decrease quantity",
+    "increaseQuantity": "Increase quantity",
+    "addToCart": "Add to cart",
+    "outOfStock": "Sold out",
+    "reserve": "Reserve item",
+    "saveToWishlist": "Save to wishlist",
+    "savedToWishlist": "Saved to wishlist",
+    "toast": {
+      "addedTitle": "Added to cart",
+      "addedDescription": "{quantity} × {productName}",
+      "viewCart": "View cart",
+      "loginRequiredTitle": "Sign in to reserve",
+      "loginRequiredDescription": "You need an account to use the reservation service",
+      "removedFromWishlist": "Removed from your wishlist",
+      "addedToWishlist": "Saved to your wishlist"
+    }
+  },
+
+  "reviews": {
+    "header": {
+      "eyebrow": "What our customers say",
+      "title": "Reviews"
+    },
+    "summary": {
+      "averageAriaLabel": "Average: {rating} out of 5 stars",
+      "totalSingular": "{count} review",
+      "totalPlural": "{count} reviews",
+      "barAriaLabel": "{count} reviews with {rating} stars"
+    },
+    "loginPrompt": {
+      "title": "Do you already own this product?",
+      "description": "Sign in or create an account to share your experience with other customers.",
+      "loginButton": "Sign in",
+      "registerButton": "Create account"
+    },
+    "empty": {
+      "title": "No reviews yet",
+      "descriptionAuthenticated": "Be the first to share your experience with this product.",
+      "descriptionGuest": "Be the first to share your experience. Sign in to write a review."
+    },
+    "form": {
+      "ariaLabel": "Write a review for {productName}",
+      "title": "Write your review",
+      "ratingLabel": "Your rating",
+      "ratingGroupAriaLabel": "Rating from 1 to 5 stars",
+      "starSingular": "{count} star",
+      "starPlural": "{count} stars",
+      "titleLabel": "Title of your review",
+      "titlePlaceholder": "E.g. Beautiful and well packed",
+      "titleHint": "Between 3 and 80 characters",
+      "commentLabel": "Your opinion",
+      "commentPlaceholder": "Tell us about your experience with the product. What did you like? What would you improve?",
+      "commentHint": "Between 20 and 1000 characters",
+      "submitButton": "Publish review",
+      "submitting": "Sending...",
+      "errors": {
+        "ratingRequired": "Select a rating",
+        "titleMin": "Minimum 3 characters",
+        "titleMax": "Maximum 80 characters",
+        "commentMin": "Minimum 20 characters",
+        "commentMax": "Maximum 1000 characters"
+      },
+      "toast": {
+        "successTitle": "Thanks for your review!",
+        "successDescription": "It will appear on the product soon.",
+        "errorTitle": "We couldn't send your review",
+        "errorDescription": "Try again in a few moments."
+      }
+    },
+    "list": {
+      "loadMoreSingular": "View {count} more review",
+      "loadMorePlural": "View {count} more reviews",
+      "ratingAriaLabel": "{rating} out of 5 stars",
+      "verifiedPurchase": "Verified purchase",
+      "helpfulSingular": "{count} person found this helpful",
+      "helpfulPlural": "{count} people found this helpful"
+    },
+    "relativeTime": {
+      "justNow": "a few seconds ago"
+    }
+  },
+
+  "catalog": {
+    "categoryEyebrow": "Category",
+    "piecesInCollectionSingular": "{count} piece in collection",
+    "piecesInCollectionPlural": "{count} pieces in collection",
+    "categoryDescriptions": {
+      "Aretes": "From minimalist designs for daily use to statement pieces for special occasions. Handmade with sterling silver 925, rose gold, surgical steel and natural stones.",
+      "Collares": "Delicate chains, meaningful pendants and statement necklaces. Pieces to wear every day or reserve for special moments.",
+      "Pulseras": "Hand-woven bracelets, silver options and adjustable styles. Comfortable for daily wear and perfect for layering.",
+      "Gargantillas": "Close-to-neck designs with noble materials. From velvet to sterling silver 925 with natural stones."
+    },
+    "metaDescriptions": {
+      "Aretes": "Handcrafted earrings in sterling silver 925, rose gold and surgical steel. Designs from minimalist to statement for every occasion.",
+      "Collares": "Handcrafted necklaces in sterling silver 925, rose gold and natural stones. Chains, pendants and statement designs.",
+      "Pulseras": "Hand-woven bracelets and sterling silver pieces. Adjustable, comfortable and designed for daily wear.",
+      "Gargantillas": "Handcrafted chokers in silver, velvet and leather. Unique pieces made by hand in Mexico."
+    },
+    "sortBar": {
+      "productSingular": "product",
+      "productPlural": "products",
+      "sortLabel": "Sort:",
+      "options": {
+        "nuevos": "Newest",
+        "precio_asc": "Price low to high",
+        "precio_desc": "Price high to low",
+        "nombre": "Alphabetical (A-Z)"
+      }
+    },
+    "filters": {
+      "title": "Filters",
+      "clear": "Clear",
+      "clearAll": "Clear all",
+      "openFilters": "Open filters",
+      "filtersTrigger": "Filters",
+      "drawerDescription": "Apply filters to refine the displayed products",
+      "viewProductsZero": "No products",
+      "viewProductsSingular": "View 1 product",
+      "viewProductsPlural": "View {count} products",
+      "groups": {
+        "price": "Price",
+        "material": "Material",
+        "color": "Color",
+        "availability": "Availability"
+      },
+      "price": {
+        "minPlaceholder": "Min",
+        "maxPlaceholder": "Max",
+        "minAriaLabel": "Minimum price",
+        "maxAriaLabel": "Maximum price",
+        "currency": "In Mexican pesos"
+      },
+      "availability": {
+        "onlyInStock": "In stock only"
+      }
+    },
+    "pagination": {
+      "ariaLabel": "Pagination",
+      "previous": "Previous page",
+      "next": "Next page",
+      "goToPage": "Go to page {page}"
+    },
+    "noResults": {
+      "title": "No pieces found",
+      "description": "Try adjusting the filters or clearing them to see the full collection.",
+      "clearButton": "Clear filters"
+    },
+    "relatedProducts": {
+      "eyebrow": "You might also like",
+      "title": "Related products"
+    }
+  },
+
+  "reservation": {
+    "modal": {
+      "eyebrow": "Reserve item",
+      "closeButton": "Close",
+      "rules": {
+        "title": "How it works",
+        "depositLine": "You pay a deposit of <strong>{amount}</strong> ({percentage}% of the price)",
+        "durationLine": "You have <strong>{days} days</strong> to complete the remaining payment",
+        "expirationLine": "If you don't pay on time, the reservation expires and <strong>you lose the deposit</strong>"
+      },
+      "summary": {
+        "totalPrice": "Total price",
+        "depositToday": "Deposit today",
+        "remaining": "Remaining (due in {days} days)"
+      },
+      "payButton": "Pay deposit {amount} with",
+      "payButtonAriaLabel": "Pay deposit of {amount} with PayPal",
+      "processing": "Processing...",
+      "cancelButton": "Cancel",
+      "toast": {
+        "successTitle": "Item reserved!",
+        "successDescription": "You have {days} days to complete the payment",
+        "errorTitle": "Could not create reservation",
+        "errorDescription": "Try again in a few moments"
+      }
+    },
+    "page": {
+      "title": "My reservations",
+      "subtitleEmpty": "You haven't reserved any items yet",
+      "subtitleSingular": "{count} reservation in total",
+      "subtitlePlural": "{count} reservations in total",
+      "tabsAriaLabel": "Reservation filters",
+      "tabs": {
+        "active": "Active",
+        "completed": "Completed",
+        "history": "History"
+      },
+      "emptyAll": {
+        "title": "You haven't reserved anything yet",
+        "description": "Reserve a product by paying just 20% as a deposit. You have 5 days to complete the payment and choose how to receive it.",
+        "subtext": "Perfect for pieces you're considering buying.",
+        "ctaButton": "Browse products"
+      },
+      "emptyTab": {
+        "active": {
+          "title": "You have no active reservations",
+          "description": "When you reserve a product, it will appear here with its remaining time."
+        },
+        "completed": {
+          "title": "No completed reservations",
+          "description": "Reservations you pay in full will appear here."
+        },
+        "history": {
+          "title": "Empty history",
+          "description": "Reservations that expire or are cancelled will appear here."
+        }
+      }
+    },
+    "card": {
+      "viewProductAriaLabel": "View {productName}",
+      "status": {
+        "active": "Active",
+        "completed": "Completed",
+        "expired": "Expired",
+        "cancelled": "Cancelled"
+      },
+      "active": {
+        "expiresIn": "Expires in",
+        "depositPaid": "Deposit paid",
+        "remaining": "Remaining",
+        "completeButton": "Complete payment",
+        "cancelButton": "Cancel",
+        "confirmCancelText": "Cancel this reservation? Remember the deposit of <strong>{amount}</strong> is non-refundable.",
+        "confirmYes": "Yes, cancel",
+        "confirmNo": "No, keep it",
+        "toastCancelledTitle": "Reservation cancelled",
+        "toastCancelledDescription": "The deposit is non-refundable"
+      },
+      "completed": {
+        "totalPaid": "Total paid",
+        "pickup": "Pickup in store",
+        "shipping": "Home delivery",
+        "completedOn": "Completed on {date}"
+      },
+      "terminal": {
+        "expiredMessage": "The reservation expired without completing the payment",
+        "cancelledMessage": "Reservation cancelled voluntarily",
+        "depositLost": "Deposit lost"
+      }
+    },
+    "completeModal": {
+      "eyebrow": "Complete payment",
+      "closeButton": "Close",
+      "summary": {
+        "title": "Payment summary",
+        "depositPaid": "Deposit paid",
+        "payNow": "To pay now",
+        "productTotal": "Product total"
+      },
+      "deliveryQuestion": "How would you like to receive it?",
+      "deliveryAriaLabel": "Delivery method",
+      "pickup": {
+        "label": "Pickup in store",
+        "description": "No cost · We'll notify you when it's ready"
+      },
+      "shipping": {
+        "label": "Home delivery",
+        "description": "Shipping cost included · 3-5 business days"
+      },
+      "payButton": "Pay {amount} with",
+      "payButtonAriaLabel": "Pay {amount} with PayPal",
+      "processing": "Processing...",
+      "cancelButton": "Cancel",
+      "toast": {
+        "successTitle": "Payment completed!",
+        "successDescriptionPickup": "We'll let you know when it's ready for pickup",
+        "successDescriptionShipping": "We'll email you the shipping tracking details"
+      }
+    }
+  },
+
+  "cart": {
+    "item": {
+      "viewDetails": "View details of {productName}",
+      "removeFromCart": "Remove {productName} from cart",
+      "decreaseQuantity": "Decrease quantity",
+      "increaseQuantity": "Increase quantity",
+      "pricePerUnit": "ea"
+    },
+    "toast": {
+      "removed": "Product removed",
+      "restored": "Restored",
+      "undo": "Undo"
+    }
+  },
+
+  "checkout": {
+    "page": {
+      "breadcrumbCart": "Cart",
+      "breadcrumbCheckout": "Checkout",
+      "title": "Complete purchase",
+      "errorToast": {
+        "title": "Check the marked fields",
+        "description": "There are errors in the form"
+      }
+    },
+    "summary": {
+      "title": "Order summary",
+      "quantity": "Quantity:",
+      "subtotal": "Subtotal",
+      "total": "Total",
+      "payButton": "Pay with",
+      "payButtonAriaLabel": "Pay with PayPal",
+      "processing": "Processing...",
+      "securityNotice": "Your payment is processed securely. We do not store your card information."
+    },
+    "confirmation": {
+      "successHeader": {
+        "title": "Your order is confirmed!",
+        "emailSent": "We sent the details to",
+        "orderNumber": "Order number"
+      },
+      "order": {
+        "title": "Your order",
+        "quantityLabel": "Quantity:",
+        "subtotal": "Subtotal",
+        "totalPaid": "Total paid"
+      },
+      "shipping": {
+        "title": "Shipping to",
+        "phoneLabel": "Phone:",
+        "notesLabel": "Notes"
+      },
+      "estimatedTime": {
+        "title": "Estimated time",
+        "emailFollowUp": "We'll email you when your order is shipped"
+      },
+      "minimalNotice": "We sent you an email with all the details of your order. If you have any questions, contact us referencing the order number.",
+      "invalidOrder": {
+        "title": "Hmm, we couldn't find your order",
+        "description": "This URL doesn't correspond to a valid order. If you just made a purchase, check your confirmation email.",
+        "backHome": "Back to home"
+      },
+      "cta": {
+        "continueShopping": "Continue shopping",
+        "viewOrders": "View my orders"
+      },
+      "guestAccount": {
+        "title": "Create your account in one click",
+        "description": "We already have your order details. Just choose a password and you'll be able to view your orders, save your address, and shop faster next time.",
+        "createButton": "Create account",
+        "emailLabel": "Email",
+        "passwordLabel": "Choose a password",
+        "showPassword": "Show password",
+        "hidePassword": "Hide password",
+        "submitButton": "Create account",
+        "submitting": "Creating...",
+        "cancelButton": "No, thanks",
+        "successTitle": "Account created successfully!",
+        "successDescription": "You can now view your orders anytime from your account",
+        "toastSuccess": "Account created!",
+        "toastSuccessDescription": "Welcome {firstName}",
+        "errorEmpty": "Please enter a password",
+        "errorRequirements": "The password doesn't meet the requirements",
+        "errorGeneric": "Error creating account"
+      }
+    }
+  }
+}

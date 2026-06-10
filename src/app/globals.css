@@ -1,0 +1,402 @@
+/**
+ * ============================================================================
+ * SISTEMA DE DISEÑO KATALINA
+ * ============================================================================
+ *
+ * Este archivo declara todos los tokens visuales de la app:
+ *   - Colores (paleta Rosa Polvo & Cobre)
+ *   - Tipografía (Playfair Display + DM Sans)
+ *   - Radios (squared, estilo Pandora)
+ *   - Espaciado custom para secciones
+ *
+ * Cómo se carga:
+ *   src/app/layout.tsx hace `import "./globals.css"` y eso ejecuta esto
+ *   una sola vez al cargar la app. Las variables quedan disponibles en
+ *   :root, lo que las hace accesibles desde TODOS los componentes.
+ *
+ * Cómo se consume:
+ *   - Componentes shadcn/ui (Button, Card, etc.): usan las clases
+ *     `bg-primary`, `text-foreground`, etc., generadas por @theme inline.
+ *   - Componentes custom: pueden usar las clases Tailwind o leer directo
+ *     las variables con `var(--color-primary)` si necesitan ese nivel.
+ * ============================================================================
+ */
+ 
+@import "tailwindcss";
+ 
+/* ============================================================================
+ * VARIANTE DARK MODE
+ * ============================================================================
+ * Define que la variante `dark:` de Tailwind se active cuando hay un ancestro
+ * con la clase `.dark`. Esto permite hacer:
+ *
+ *   <button class="bg-background dark:bg-background">
+ *
+ * y que el navegador resuelva los colores correctos según el tema activo.
+ *
+ * El selector `&:is(.dark *)` significa: "este elemento O cualquier descendiente
+ * de un .dark". Es la forma recomendada por shadcn para Tailwind v4.
+ * ============================================================================
+ */
+@custom-variant dark (&:is(.dark *));
+ 
+/* ============================================================================
+ * TOKENS — TEMA CLARO (DEFAULT)
+ * ============================================================================
+ * Aquí viven los valores reales de la paleta Rosa Polvo & Cobre.
+ *
+ * Convención de nombres (compatible con shadcn/ui):
+ *   --foo            : color de fondo o color principal
+ *   --foo-foreground : color del texto que va ENCIMA de ese fondo
+ *
+ * Por ejemplo: --primary es el color del botón, --primary-foreground es
+ * el color del texto DENTRO de ese botón. Esto garantiza contraste correcto
+ * automáticamente.
+ * ============================================================================
+ */
+:root {
+  /* --------------------------------------------------------------------------
+   * SUPERFICIES — capas de fondo, de la más profunda a la más elevada
+   * -------------------------------------------------------------------------- */
+ 
+  /* Background = el "lienzo" de toda la app. Crema rosa cálida que es
+     más interesante que un blanco puro pero no compite con la fotografía. */
+  --background: #FBF6F1;
+  --foreground: #2D1F1A; /* Cacao oscuro = texto principal */
+ 
+  /* Surface = blanco puro, usado para cards, modales, dropdowns, inputs.
+     El contraste sutil entre crema (background) y blanco (surface) crea
+     profundidad visual sin necesidad de sombras o bordes pronunciados. */
+  --surface: #FFFFFF;
+  --surface-foreground: #2D1F1A;
+ 
+  /* Card = alias semántico de surface. shadcn/ui usa este nombre para
+     componentes Card, así que lo declaramos por compatibilidad. */
+  --card: #FFFFFF;
+  --card-foreground: #2D1F1A;
+ 
+  /* Popover = idem para Dropdowns, Tooltips, Command palette */
+  --popover: #FFFFFF;
+  --popover-foreground: #2D1F1A;
+ 
+  /* --------------------------------------------------------------------------
+   * MARCA — los tres colores que definen la identidad visual
+   * -------------------------------------------------------------------------- */
+ 
+  /* PRIMARY = Cacao oscuro
+     Decisión clave: el "primary" en Katalina NO es el rosa de marca, es
+     el cacao. ¿Por qué? Porque las marcas de joyería de lujo (Pandora, Tiffany,
+     Cartier) usan negro como CTA principal, reservando los colores de marca
+     para acentos. El rosa polvo lo usaríamos en TODO lo importante el sitio
+     se vería como una página de quinceañera, no de joyería refinada.
+     
+     Visualmente --primary y --foreground son el mismo cacao, pero conceptualmente
+     son distintos: foreground = "color del texto", primary = "color de superficies
+     que necesitan máximo contraste" (botones, banners). */
+  --primary: #2D1F1A;
+  --primary-foreground: #FBF6F1;
+ 
+  /* SECONDARY = Rosa Polvo
+     El acento de marca. Se usa para: botones de "agregar a wishlist",
+     badges de "nuevo", precios en oferta, hover states sutiles, detalles
+     de la marca. Reservado, no abusado. */
+  --secondary: #B85C5C;
+  --secondary-foreground: #FBF6F1;
+ 
+  /* ACCENT = Cobre
+     El "metálico" de la marca, equivalente al oro en Pandora pero más cálido
+     y mexicano. Lo usamos para: detalles premium ("edición especial"),
+     CTAs de reservación, enlaces de "descubrir más", iconos decorativos. */
+  --accent: #B07953;
+  --accent-foreground: #FBF6F1;
+ 
+  /* --------------------------------------------------------------------------
+   * VARIANTES — versiones extra de los colores de marca para hover/subtle
+   * -------------------------------------------------------------------------- */
+ 
+  /* Hover de primary: cacao un poco más claro (suave, no agresivo) */
+  --primary-hover: #4A3329;
+ 
+  /* Hover de secondary: rosa polvo más oscuro (muestra que es clickeable) */
+  --secondary-hover: #9F4A4A;
+ 
+  /* Hover de accent: cobre más oscuro */
+  --accent-hover: #8E5F3F;
+ 
+  /* Versión muy clara del rosa polvo: para fondos sutiles tipo "este producto
+     está en tu wishlist" o badges suaves. Casi imperceptible pero suficiente. */
+  --secondary-subtle: #F5E1E1;
+ 
+  /* Versión muy clara del cobre: para banners de "edición limitada" */
+  --accent-subtle: #F0DDC9;
+ 
+  /* --------------------------------------------------------------------------
+   * TEXTO Y FONDOS SECUNDARIOS
+   * -------------------------------------------------------------------------- */
+ 
+  /* Muted = "silenciado". Fondo discreto para secciones secundarias, tags,
+     placeholders. Más oscuro que background pero más claro que cualquier card. */
+  --muted: #F5EFE8;
+  --muted-foreground: #8A7570; /* Gris cálido para meta, fechas, descripciones */
+ 
+  /* --------------------------------------------------------------------------
+   * BORDES Y FORMULARIOS
+   * -------------------------------------------------------------------------- */
+ 
+  /* Border = el borde por defecto de cards, separadores, inputs.
+     Es un beige cálido (no gris frío) para mantener la armonía con el fondo crema. */
+  --border: #E8DDD0;
+ 
+  /* Border más fuerte: cuando necesitas que se note (ej. focus, hover) */
+  --border-strong: #C9B9A8;
+ 
+  /* Input = borde de inputs en estado normal */
+  --input: #E8DDD0;
+ 
+  /* Ring = anillo de focus (cuando un elemento tiene foco con teclado).
+     Lo hacemos rosa polvo porque en focus QUEREMOS atención. */
+  --ring: #B85C5C;
+ 
+  /* --------------------------------------------------------------------------
+   * SEMÁNTICOS — mensajes de estado del sistema
+   * -------------------------------------------------------------------------- */
+ 
+  /* Destructive = rojo de error/eliminar.
+     Importante: usamos un rojo DIFERENTE del rosa polvo para que el usuario
+     no confunda "color de marca" con "alerta de eliminación".
+     Es un rojo más saturado y "frío" que claramente comunica peligro. */
+  --destructive: #C53030;
+  --destructive-foreground: #FFFFFF;
+ 
+  /* Si en el futuro necesitas success/warning/info, los agregas aquí
+     siguiendo el mismo patrón.
+     Sugerencia: success #5A8A4F, warning #D69E2E, info #3B82F6 */
+ 
+  /* --------------------------------------------------------------------------
+   * RADIO — la "personalidad" geométrica de la marca
+   * -------------------------------------------------------------------------- */
+ 
+  /* Katalina usa esquinas casi rectas para el look de joyería de lujo.
+     Pandora, Tiffany, Cartier todas usan radios mínimos (0-4px).
+     El default de shadcn es 8px que se ve "tech startup", no "lujo". */
+  --radius: 4px;
+}
+ 
+/* ============================================================================
+ * TOKENS — TEMA OSCURO
+ * ============================================================================
+ * Activado cuando un ancestro tiene la clase `.dark` (típicamente <html>).
+ *
+ * Estrategia: invertir las superficies (cacao → fondo, crema → texto) y
+ * aclarar los colores de marca para mantener buen contraste sobre fondo oscuro.
+ *
+ * Por ahora la app probablemente solo usará tema claro, pero declaramos esto
+ * desde el principio para no tener que migrar después. Cuando estés listo
+ * para activar dark mode solo necesitas un toggle que agregue/quite .dark al <html>.
+ * ============================================================================
+ */
+.dark {
+  --background: #1A1410;
+  --foreground: #FBF6F1;
+ 
+  --surface: #241B16;
+  --surface-foreground: #FBF6F1;
+ 
+  --card: #241B16;
+  --card-foreground: #FBF6F1;
+ 
+  --popover: #241B16;
+  --popover-foreground: #FBF6F1;
+ 
+  /* En dark mode el cacao no funciona como CTA (no hay contraste),
+     así que primary se vuelve crema (inverso del light mode). */
+  --primary: #FBF6F1;
+  --primary-foreground: #1A1410;
+  --primary-hover: #E8DDD0;
+ 
+  /* Rosa polvo más claro para mantener visibilidad sobre fondo oscuro */
+  --secondary: #C97070;
+  --secondary-foreground: #1A1410;
+  --secondary-hover: #D88585;
+  --secondary-subtle: #3D2424;
+ 
+  --accent: #C99070;
+  --accent-foreground: #1A1410;
+  --accent-hover: #D8A585;
+  --accent-subtle: #3D2A1F;
+ 
+  --muted: #2D1F1A;
+  --muted-foreground: #A89484;
+ 
+  --border: #3D2D24;
+  --border-strong: #5C4A40;
+  --input: #3D2D24;
+  --ring: #C97070;
+ 
+  --destructive: #E25555;
+  --destructive-foreground: #FFFFFF;
+}
+ 
+/* ============================================================================
+ * EXPOSICIÓN A TAILWIND
+ * ============================================================================
+ * Esto es lo que hace que `bg-primary`, `text-foreground`, etc. existan
+ * como clases utilitarias.
+ *
+ * @theme inline = "no inlines los valores, deja referencias var(--color-X)
+ * en las clases generadas". Esto es CRÍTICO para que dark mode funcione:
+ * cuando .dark está presente, las variables cambian y las clases se actualizan
+ * automáticamente sin necesidad de regenerar CSS.
+ * ============================================================================
+ */
+@theme inline {
+  /* Colores: Tailwind genera bg-{nombre}, text-{nombre}, border-{nombre}, etc. */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+ 
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
+ 
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+ 
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+ 
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+ 
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary-hover: var(--secondary-hover);
+  --color-secondary-subtle: var(--secondary-subtle);
+ 
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-subtle: var(--accent-subtle);
+ 
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+ 
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+ 
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+ 
+  /* Tipografía: estas variables las setea next/font en el <html>
+     (vía className={playfair.variable}), Tailwind las lee desde aquí.
+     Resultado: las clases `font-display` y `font-sans` ya funcionan. */
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+ 
+  /* Radios: escala de redondez. La uso con clases tipo `rounded-md` y `rounded-lg`.
+     Mantenemos números pequeños porque la marca es "squared luxury". */
+  --radius-sm: 0px;                       /* Totalmente recto (badges, pills cuando no se quieren redondas) */
+  --radius-md: var(--radius);             /* 4px — el default para botones, cards, inputs */
+  --radius-lg: calc(var(--radius) + 4px); /* 8px — cards grandes, modales */
+  --radius-xl: calc(var(--radius) + 12px); /* 16px — solo casos especiales (drawer móvil) */
+ 
+  /* Espaciado custom para secciones. Pandora usa secciones MUY altas para dar
+     respiración. Ofrezco dos tamaños: estándar y hero. */
+  --spacing-section: 6rem;     /* 96px de padding vertical = sección normal */
+  --spacing-section-lg: 9rem;  /* 144px = sección hero o anchor */
+}
+ 
+/* ============================================================================
+ * ESTILOS BASE GLOBALES
+ * ============================================================================
+ * @layer base = se aplican a elementos HTML por defecto, sin necesidad de
+ * agregar clases. Es el equivalente a "reset CSS" pero usando los tokens
+ * que acabamos de definir.
+ * ============================================================================
+ */
+@layer base {
+  /* Border-color por default: cualquier elemento con `border` (sin especificar
+     color) usa nuestro token de borde. Esto evita que los bordes default de
+     Tailwind (gris frío) se cuelen en la app. */
+  * {
+    border-color: var(--color-border);
+  }
+ 
+  /* HTML: aplica color de scrollbar nativo en navegadores que lo soportan.
+     `color-scheme` también ajusta inputs nativos (date pickers, etc.) al tema. */
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+
+  html {
+    /*
+     * scroll-behavior: smooth hace que cualquier navegación por anclas
+     * (href="#section-id") use scroll suave en lugar de salto instantáneo.
+     *
+     * Esto se aplica a:
+     *   - Clics en links con anclas (índice de páginas legales, FAQ, etc.)
+     *   - Navegación con teclado (tab + enter)
+     *   - JavaScript que cambia window.location.hash
+     *
+     * Accesibilidad: los navegadores respetan automáticamente la
+     * preferencia de usuario "prefers-reduced-motion" — si el usuario
+     * tiene activada esa configuración del sistema operativo, el scroll
+     * vuelve a ser instantáneo sin que tengamos que hacer nada extra.
+     */
+    scroll-behavior: smooth;
+  }
+
+ 
+  /* Body: aplica fondo, color de texto, fuente sans por defecto, antialiasing.
+     Esto es lo que hace que CUALQUIER texto sin clase específica se vea bien. */
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+ 
+    /* Ligaduras tipográficas. DM Sans tiene ligaduras bonitas para "fi", "fl",
+     etc. y "calt" activa alternancias contextuales. Detalle de refinamiento. */
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+ 
+  /* Headings: por defecto usan Playfair, peso 500 (más refinado que 700).
+     `tracking-tight` reduce ligeramente el letter-spacing porque las Didone
+     a tamaños grandes se ven mejor con letras un pelín más juntas. */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    color: var(--color-foreground);
+  }
+ 
+  /* Selección de texto en color de marca: cuando el usuario selecciona texto
+     con el cursor, el highlight es rosa polvo suave. Detalle pequeño que
+     refuerza la identidad de marca en cada interacción. */
+  ::selection {
+    background-color: var(--color-secondary-subtle);
+    color: var(--color-secondary);
+  }
+ 
+  /* Scrollbar custom (solo Webkit/Chromium) — sutil, en tonos de marca.
+     Firefox usa scrollbar-color que setearíamos en :root si lo necesitáramos. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background-color: var(--color-muted);
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-border-strong);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-muted-foreground);
+  }
+}
