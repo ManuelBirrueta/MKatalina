@@ -1,70 +1,55 @@
 /**
  * ============================================================================
- * RESERVATION TYPES — KATALINA
+ * RESERVATION TYPES — KATALINA (Fase 12 Turno 3B.4: formatTimeRemaining bilingüe)
  * ============================================================================
  *
- * Tipos del sistema de apartado de productos.
+ * Cambios respecto a la versión anterior:
+ *   - `formatTimeRemaining(reservation)` cambia firma a
+ *     `formatTimeRemaining(reservation, t)` donde `t` es la función traductora
+ *     de useTranslations para el namespace "reservation.card.active.timeRemaining".
+ *   - Los textos "Expirado", "X día(s) Y hora(s)", "X hora(s) Y minuto(s)",
+ *     "X minuto(s)" se construyen con t() en lugar de strings hardcoded.
  *
- * Reglas del negocio (decididas con el cliente):
- *   - Duración: 5 días desde la creación
- *   - Anticipo: 20% del precio del producto
- *   - Solo productos en stock se pueden apartar
- *   - 1 producto por apartado
- *   - Al expirar, pierde el anticipo y el producto vuelve a inventario
- *   - Al completar el pago, cliente elige recoger en tienda o envío
+ * Lo que NO cambia:
+ *   - Todos los demás tipos y funciones (Reservation, getEffectiveStatus,
+ *     isReservationExpired, getTimeRemaining)
+ *   - La lógica de cálculo de tiempo (totalMinutes, totalHours, totalDays)
  *
- * En Fase 12 con backend:
- *   - Los apartados viven en una tabla `reservations` con FK al usuario y al producto
- *   - El backend maneja la lógica de expiración con un cron job
- *   - El "bloqueo de inventario" se hace en una tabla `product_stock_holds`
- * ============================================================================
+ * ─── POR QUÉ RECIBE t COMO PARÁMETRO ──────────────────────────────────
+ *
+ * formatTimeRemaining es una función PURA — no es un componente React,
+ * por lo tanto NO puede llamar a hooks como useTranslations directamente.
+ * Las funciones puras no tienen acceso al contexto de React.
+ *
+ * La solución es recibir las traducciones desde el caller (que SÍ es un
+ * componente React que ha llamado a useTranslations).
+ *
+ * Patrón equivalente al que ya usamos en validateField (CheckoutForm,
+ * ReviewForm) y getShippingMethodResolved (checkout). Consistencia ✓.
+ *
+ * ─── TIPADO DE LA FUNCIÓN t ────────────────────────────────────────────
+ *
+ * Usamos un type genérico `TranslateFn` que acepta una clave y devuelve
+ * string. Esto es más liberal que el tipo estricto de next-intl que sería
+ * `ReturnType<typeof useTranslations<"reservation.card.active.timeRemaining">>`
+ * — pero más estricto sería frágil porque obligaría al caller a tener
+ * exactamente ese namespace.
+ *
+ * Mantenemos la firma simple: el caller pasa cualquier `(key, values?) => string`
+ * y nosotros confiamos en que tiene las claves correctas.
+ * ─────────────────────────────────────────────────────────────────────
  */
 
 /**
- * Constantes del sistema.
- *
- * Las centralizamos aquí para que sea fácil cambiar las reglas del negocio
- * en un solo lugar. Si en el futuro decides cambiar a 7 días o 25% de
- * anticipo, solo cambias estos valores.
+ * Constantes del sistema (sin cambios).
  */
 export const RESERVATION_DURATION_DAYS = 5;
 export const RESERVATION_DEPOSIT_PERCENTAGE = 0.20; // 20%
 
-/**
- * Status de un apartado.
- *
- * Estados posibles:
- *   - active: apartado vigente, todavía dentro del plazo de 5 días
- *   - completed: el cliente pagó el restante, apartado cerrado exitosamente
- *   - expired: pasaron los 5 días sin pago, apartado cancelado, anticipo perdido
- *   - cancelled: el cliente canceló voluntariamente antes de expirar
- *     (mantiene la opción legal de cancelar; el anticipo NO se devuelve)
- *
- * Nota: el status "expired" se determina dinámicamente al renderizar
- * (comparando fechaExpiracion vs Date.now()) en lugar de marcarlo con un
- * timer. Esto es más robusto y no requiere mantener procesos corriendo.
- */
 export type ReservationStatus = "active" | "completed" | "expired" | "cancelled";
 
-/**
- * DeliveryMethod — cómo recibe el producto al completar el pago.
- *
- * null mientras no haya completado el pago (todavía no eligió).
- * Se asigna al pagar el restante.
- */
 export type DeliveryMethod = "pickup" | "shipping" | null;
 
-/**
- * ProductSnapshot — captura del producto al momento de apartar.
- *
- * Por qué guardamos un snapshot en lugar de solo el slug:
- *   - Si el precio del producto cambia después de crear el apartado, el
- *     cliente debe ver el precio que pactó al apartar, no el actual.
- *   - Si el producto se elimina del catálogo, el apartado sigue siendo
- *     legible (tiene toda la info necesaria).
- *   - Igual que con OrderSnapshot en la fase de checkout: una vez creado,
- *     el registro es inmutable.
- */
 export interface ProductSnapshot {
   slug: string;
   name: string;
@@ -76,69 +61,35 @@ export interface ProductSnapshot {
   image: string;
 }
 
-/**
- * Reservation — el record completo de un apartado.
- */
 export interface Reservation {
-  /** ID único del apartado (generado al crear) */
   id: string;
-
-  /** ID del usuario que creó el apartado */
   userId: string;
-
-  /** Snapshot del producto apartado (inmutable después de crear) */
   product: ProductSnapshot;
-
-  /**
-   * Monto del anticipo en MXN.
-   * Calculado al crear como producto.price × RESERVATION_DEPOSIT_PERCENTAGE.
-   * Se guarda en el record para que sea inmutable (si cambia la regla del
-   * porcentaje, los apartados viejos mantienen su anticipo original).
-   */
   depositAmount: number;
-
-  /** Monto restante por pagar (= producto.price - depositAmount) */
   remainingAmount: number;
-
-  /** Fecha de creación en formato ISO */
   createdAt: string;
-
-  /** Fecha de expiración en formato ISO (= createdAt + 5 días) */
   expiresAt: string;
-
-  /**
-   * Status del apartado. NO incluye "expired" porque ese se calcula
-   * dinámicamente. Los valores aquí son los persistidos:
-   *   - active: vigente (puede o no estar expirado dinámicamente)
-   *   - completed: cliente pagó el resto
-   *   - cancelled: cliente lo canceló voluntariamente
-   */
   status: "active" | "completed" | "cancelled";
-
-  /**
-   * Método de entrega elegido al completar el pago.
-   * null mientras el apartado esté active.
-   * Asignado solo cuando status pasa a "completed".
-   */
   deliveryMethod: DeliveryMethod;
-
-  /**
-   * Fecha en que se completó el pago, si aplica.
-   * null mientras status === "active" o "cancelled".
-   */
   completedAt: string | null;
 }
 
 /**
- * Helper: calcular si un apartado está expirado.
+ * Tipo de la función traductora que recibe formatTimeRemaining.
  *
- * Compara expiresAt vs Date.now(). Esta función se llama al renderizar
- * la UI para mostrar el status efectivo (active vs expired) sin tener que
- * mutar el record en el store.
+ * Acepta una clave (string) y opcionalmente valores para interpolación.
+ * Devuelve el texto traducido.
  *
- * Nota importante: si el status es "completed" o "cancelled", devuelve
- * false aunque haya pasado la fecha. Solo los apartados active pueden
- * estar expirados.
+ * Liberal a propósito: cualquier función con esa firma sirve, sin importar
+ * de qué namespace específico venga.
+ */
+type TranslateFn = (
+  key: string,
+  values?: Record<string, string | number>
+) => string;
+
+/**
+ * Helper sin cambios: detecta si un apartado está expirado.
  */
 export function isReservationExpired(reservation: Reservation): boolean {
   if (reservation.status !== "active") return false;
@@ -146,10 +97,7 @@ export function isReservationExpired(reservation: Reservation): boolean {
 }
 
 /**
- * Helper: obtener el status efectivo (combina el persistido + expiración).
- *
- * Esta es la función que usa la UI para decidir cómo mostrar el apartado.
- * Devuelve uno de: "active", "completed", "expired", "cancelled".
+ * Helper sin cambios: obtiene el status efectivo combinando persistido + expiración.
  */
 export function getEffectiveStatus(
   reservation: Reservation
@@ -161,49 +109,76 @@ export function getEffectiveStatus(
 }
 
 /**
- * Helper: calcular tiempo restante en milisegundos.
- *
- * Devuelve la diferencia entre expiresAt y ahora. Si es negativo,
- * el apartado ya expiró. La UI usa esto para mostrar contadores
- * regresivos ("Expira en 2 días 14 horas").
+ * Helper sin cambios: tiempo restante en milisegundos.
  */
 export function getTimeRemaining(reservation: Reservation): number {
   return new Date(reservation.expiresAt).getTime() - Date.now();
 }
 
 /**
- * Helper: formatear tiempo restante como texto legible.
+ * Helper bilingüe: formatear tiempo restante como texto legible.
  *
- * Ejemplos de salida:
+ * @param reservation - El apartado a formatear
+ * @param t - Función traductora para el namespace "reservation.card.active.timeRemaining"
+ *
+ * Ejemplos de salida en /es:
+ *   - "Expirado"
  *   - "4 días 12 horas"
  *   - "1 día 3 horas"
  *   - "5 horas 30 minutos"
  *   - "15 minutos"
- *   - "Expirado"
  *
- * La unidad más grande dictada por el tiempo restante:
- *   - >= 24 horas: muestra días + horas
- *   - 1-24 horas: muestra horas + minutos
- *   - < 1 hora: solo minutos
+ * Ejemplos de salida en /en:
+ *   - "Expired"
+ *   - "4 days 12 hours"
+ *   - "1 day 3 hours"
+ *   - "5 hours 30 minutes"
+ *   - "15 minutes"
+ *
+ * Las claves que t() debe poder resolver:
+ *   - expired
+ *   - day (singular)
+ *   - days (plural)
+ *   - hour (singular)
+ *   - hours (plural)
+ *   - minute (singular)
+ *   - minutes (plural)
+ *
+ * La lógica de pluralización se hace AQUÍ (no en messages.json) porque
+ * son palabras simples sin interpolación compleja. Si en el futuro
+ * necesitamos pluralización compleja (ej. ruso con 3 formas plurales),
+ * lo migramos a `t.plural()` de next-intl.
  */
-export function formatTimeRemaining(reservation: Reservation): string {
+export function formatTimeRemaining(
+  reservation: Reservation,
+  t: TranslateFn
+): string {
   const ms = getTimeRemaining(reservation);
 
-  if (ms <= 0) return "Expirado";
+  // Caso 1: expirado (devuelve el label traducido)
+  if (ms <= 0) return t("expired");
 
   const totalMinutes = Math.floor(ms / (1000 * 60));
   const totalHours = Math.floor(totalMinutes / 60);
   const totalDays = Math.floor(totalHours / 24);
 
+  // Caso 2: >= 1 día → muestra "X día/s Y hora/s"
   if (totalDays >= 1) {
     const remainingHours = totalHours - totalDays * 24;
-    return `${totalDays} ${totalDays === 1 ? "día" : "días"} ${remainingHours} ${remainingHours === 1 ? "hora" : "horas"}`;
+    const dayWord = totalDays === 1 ? t("day") : t("days");
+    const hourWord = remainingHours === 1 ? t("hour") : t("hours");
+    return `${totalDays} ${dayWord} ${remainingHours} ${hourWord}`;
   }
 
+  // Caso 3: 1-24 horas → muestra "X hora/s Y minuto/s"
   if (totalHours >= 1) {
     const remainingMinutes = totalMinutes - totalHours * 60;
-    return `${totalHours} ${totalHours === 1 ? "hora" : "horas"} ${remainingMinutes} ${remainingMinutes === 1 ? "minuto" : "minutos"}`;
+    const hourWord = totalHours === 1 ? t("hour") : t("hours");
+    const minuteWord = remainingMinutes === 1 ? t("minute") : t("minutes");
+    return `${totalHours} ${hourWord} ${remainingMinutes} ${minuteWord}`;
   }
 
-  return `${totalMinutes} ${totalMinutes === 1 ? "minuto" : "minutos"}`;
+  // Caso 4: < 1 hora → solo minutos
+  const minuteWord = totalMinutes === 1 ? t("minute") : t("minutes");
+  return `${totalMinutes} ${minuteWord}`;
 }

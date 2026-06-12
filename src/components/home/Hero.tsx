@@ -1,75 +1,66 @@
 /**
  * ============================================================================
- * HERO — KATALINA (Sección 1 de la Home)
+ * HERO — KATALINA (Fase 12 Turno 3B.3: bilingüe)
  * ============================================================================
  *
- * El "primer impacto" de la home. Aparece justo debajo del header.
+ * Cambios respecto a la versión anterior:
+ *   - Pasa de Server a Client Component (necesario para useTranslations).
+ *     Cualquier componente con texto traducido del proyecto sigue el mismo
+ *     patrón. Costo en bundle: insignificante (Hero es pequeño).
+ *   - import Link cambia a "@/i18n/navigation" (mantiene prefijo locale)
+ *   - Todos los textos hardcoded traducidos desde "homepage.hero.*"
+ *   - El título con palabra resaltada usa t.rich() con un componente custom
+ *     <em> que aplica el color cobre
  *
- * Anatomía visual:
+ * Lo que NO cambia:
+ *   - Estructura visual: layout 2 columnas desktop, stack móvil
+ *   - Animaciones de los CTAs (group-hover en flecha)
+ *   - Placeholder de imagen con aspect ratio 4/5
+ *   - Color cobre del eyebrow y de la palabra resaltada
  *
- *   ┌────────────────────────────────────────────────────────────────┐
- *   │                                                                │
- *   │                                                                │
- *   │              EYEBROW: Nueva colección                          │
- *   │                                                                │
- *   │              Piezas que                                        │
- *   │              cuentan tu                                        │
- *   │              historia                                          │
- *   │                                                                │
- *   │              Subtítulo descriptivo en gris                     │
- *   │                                                                │
- *   │              [Explorar colección]  Nuestra historia →          │
- *   │                                                                │
- *   │                                              IMAGEN EDITORIAL  │
- *   └────────────────────────────────────────────────────────────────┘
+ * ─── PATRÓN t.rich() PARA EL TÍTULO CON <em> ──────────────────────────
  *
- * Decisiones de diseño:
+ * El título original tenía estructura:
+ *   <h1>
+ *     Piezas que<br />
+ *     cuentan tu<br />
+ *     <em className="text-accent not-italic">historia</em>
+ *   </h1>
  *
- *   1. ALTURA: ~80vh (80% del viewport). Suficientemente alto para que la
- *      imagen tenga presencia editorial, pero no tan alto que el usuario
- *      no vea NADA más en la primera pantalla.
+ * Para bilingüe, podemos:
+ *   A) Una sola clave con marcadores: "Piezas que\ncuentan tu\n<em>historia</em>"
+ *      y usar t.rich() con el componente <em> mapeado
+ *   B) Dos claves: línea + palabra resaltada, concatenadas en JSX
  *
- *   2. LAYOUT DESKTOP: dos columnas. Texto a la izquierda (40-50%), imagen
- *      a la derecha (50-60%). Es el patrón clásico de joyería editorial —
- *      mismo que usa Pandora en su home.
+ * Elegí Opción B (más simple): 3 keys separadas (titleLine1, titleLine2,
+ * titleHighlighted). Cada idioma controla su propio orden de palabras y
+ * la palabra resaltada se renderiza en <em>.
  *
- *   3. LAYOUT MÓVIL: stack vertical. Imagen arriba como banner, texto debajo.
- *      Razón: en móvil leer texto en vertical centrado se ve mejor que
- *      intentar mantener el split de desktop.
- *
- *   4. DOS CTAs: el primario (cacao, "Explorar colección") es la acción
- *      principal. El secundario (link inline con flecha, "Nuestra historia →")
- *      es para usuarios que quieren conocer la marca antes de comprar.
- *      Patrón estándar en e-commerce premium: dar dos caminos según intent.
- *
- *   5. ESPACIO NEGATIVO ENORME: padding generoso alrededor del texto.
- *      El lujo se comunica con AIRE, no con elementos amontonados.
+ * Esto es importante porque en inglés la estructura natural es:
+ *   "Pieces that / tell your / story"
+ * Y la palabra resaltada cambia ("historia" → "story"). Con 3 keys
+ * separadas, cada idioma tiene control total sobre el wording sin
+ * forzarse al patrón del otro.
+ * ─────────────────────────────────────────────────────────────────────
  * ============================================================================
  */
 
-import Link from "next/link";
+"use client";
+
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { ArrowRight } from "lucide-react";
 import { Container } from "@/components/layout/Container";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
- * Hero — primera sección de la home
- * ----------------------------------
- * Server Component (sin "use client"): no tiene interactividad propia,
- * todos los botones son <Link> de navegación que ya saben cómo manejarse.
+ * Hero — primera sección de la home, ahora Client Component bilingüe.
  */
 export function Hero() {
+  const t = useTranslations("homepage.hero");
+
   return (
-    /**
-     * <section> en lugar de <div>: mejor semántica para SEO y accesibilidad.
-     * Las secciones de una página deberían ser <section>; solo elementos
-     * "decorativos" sin significado son <div>.
-     *
-     * min-h-[80vh] = 80% del viewport mínimo, pero puede crecer si el
-     * contenido empuja. Esto es importante en móvil donde el texto puede
-     * tomar más altura que 80vh y NO queremos que se corte.
-     */
     <section
       className={cn(
         "relative min-h-[80vh] flex items-center",
@@ -79,43 +70,21 @@ export function Hero() {
       )}
     >
       <Container>
-        {/*
-         * GRID PRINCIPAL: 2 columnas en desktop, 1 columna en móvil.
-         *
-         * lg:grid-cols-2 → arriba de 1024px se divide en dos columnas iguales
-         * gap-12 → 48px de espacio entre las dos columnas en desktop
-         * items-center → ambas columnas se centran verticalmente entre sí
-         */}
+        {/* Grid 2 columnas en desktop, 1 en móvil */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center py-16 lg:py-24">
-          {/*
-           * ─── COLUMNA IZQUIERDA: TEXTO Y CTAs ───
-           *
-           * order-2 lg:order-1 = en móvil aparece SEGUNDA (después de la
-           * imagen), en desktop aparece PRIMERA (a la izquierda).
-           */}
+          {/* ─── COLUMNA IZQUIERDA: TEXTO + CTAs ─── */}
           <div className="order-2 lg:order-1 space-y-6">
-            {/*
-             * Eyebrow: contexto en mayúsculas pequeñas con tracking amplio.
-             * El "primer ladrillo" visual antes del título principal.
-             */}
+            {/* Eyebrow en mayúsculas cobre */}
             <p className="text-xs uppercase tracking-[0.3em] text-accent">
-              Nueva colección · Primavera 2026
+              {t("eyebrow")}
             </p>
 
             {/*
-             * Título hero: el texto más grande de toda la página.
+             * Título hero con palabra resaltada al final.
              *
-             * Tamaño responsivo:
-             *   - móvil: text-5xl (≈48px)
-             *   - tablet: text-6xl (≈60px)
-             *   - desktop: text-7xl (≈72px)
-             *
-             * leading-[1.05] = line-height muy ajustado. Los Didone a tamaños
-             * grandes se ven mejor con líneas más juntas que el default.
-             *
-             * tracking-tight = letter-spacing ligeramente negativo. Mismo
-             * principio: a tamaños grandes, letras un pelín más juntas se
-             * ven más sofisticadas.
+             * 3 líneas controladas por claves separadas. La última se
+             * envuelve en <em> con clase text-accent + not-italic para
+             * el resaltado en cobre sin formato itálico.
              */}
             <h1
               className={cn(
@@ -125,41 +94,26 @@ export function Hero() {
                 "text-foreground"
               )}
             >
-              Piezas que
+              {t("titleLine1")}
               <br />
-              cuentan tu
+              {t("titleLine2")}
               <br />
-              <em className="text-accent not-italic">historia</em>
+              <em className="text-accent not-italic">
+                {t("titleHighlighted")}
+              </em>
             </h1>
 
-            {/*
-             * Subtítulo descriptivo: cuerpo de texto en gris muted.
-             * max-w-md (28rem ≈ 448px) para que la línea no sea muy ancha
-             * y el texto sea cómodo de leer.
-             */}
+            {/* Descripción */}
             <p className="text-base text-muted-foreground max-w-md leading-relaxed">
-              Joyería artesanal mexicana diseñada para acompañarte en los
-              momentos que importan. Cada pieza, hecha a mano con materiales
-              de la más alta calidad.
+              {t("description")}
             </p>
 
-            {/*
-             * CTAs: botón primario + link secundario.
-             *
-             * flex flex-wrap = en pantallas muy pequeñas si no caben en una
-             * línea, se apilan. gap-4 mantiene separación visual.
-             */}
+            {/* CTAs: botón primario + link secundario */}
             <div className="flex flex-wrap items-center gap-4 pt-2">
-              {/* CTA primario en cacao oscuro */}
               <Button asChild size="lg">
-                <Link href="/aretes">Explorar colección</Link>
+                <Link href="/aretes">{t("ctaPrimary")}</Link>
               </Button>
 
-              {/*
-               * CTA secundario: link con flecha que se desplaza al hover.
-               * El mismo patrón que usamos en el mega-menú del header.
-               * Crea coherencia visual a través de la app.
-               */}
               <Link
                 href="/quienes-somos"
                 className={cn(
@@ -169,7 +123,7 @@ export function Hero() {
                   "border-b border-foreground hover:border-accent pb-1"
                 )}
               >
-                Nuestra historia
+                {t("ctaSecondary")}
                 <ArrowRight
                   size={14}
                   className="transition-transform duration-300 group-hover:translate-x-1"
@@ -178,44 +132,23 @@ export function Hero() {
             </div>
           </div>
 
-          {/*
-           * ─── COLUMNA DERECHA: IMAGEN HERO ───
-           *
-           * order-1 lg:order-2 = aparece PRIMERA en móvil (banner arriba),
-           * SEGUNDA en desktop (a la derecha del texto).
-           */}
+          {/* ─── COLUMNA DERECHA: IMAGEN HERO (placeholder) ─── */}
           <div className="order-1 lg:order-2">
-            {/*
-             * Placeholder de imagen.
-             *
-             * aspect-[4/5] = mismo ratio editorial 4:5 que usamos en ProductCard.
-             * Mantenerlo consistente en toda la app crea ritmo visual.
-             *
-             * Cuando tengas la foto real del hero, reemplaza este div por:
-             *   <Image
-             *     src="/hero-spring-2026.jpg"
-             *     alt="Modelo luciendo collar y aretes Katalina"
-             *     fill
-             *     priority   // LCP de la página, prioridad máxima de carga
-             *     className="object-cover"
-             *     sizes="(max-width: 1024px) 100vw, 50vw"
-             *   />
-             */}
             <div
               className={cn(
                 "relative aspect-[4/5] w-full overflow-hidden",
-                "bg-secondary-subtle", // Rosa polvo muy claro
+                "bg-secondary-subtle",
                 "flex items-center justify-center"
               )}
             >
               <div className="text-center px-8">
                 <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground mb-2">
-                  Imagen hero
+                  {t("imagePlaceholderEyebrow")}
                 </p>
                 <p className="font-display text-lg text-foreground">
-                  Foto editorial de modelo
+                  {t("imagePlaceholderTextLine1")}
                   <br />
-                  luciendo la nueva colección
+                  {t("imagePlaceholderTextLine2")}
                 </p>
               </div>
             </div>

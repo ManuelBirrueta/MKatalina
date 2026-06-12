@@ -1,48 +1,79 @@
 /**
  * ============================================================================
- * REGISTER FORM — KATALINA
+ * REGISTER FORM — KATALINA (Fase 12 Turno 3B.4: bilingüe completo)
  * ============================================================================
  *
- * Formulario de creación de cuenta nueva.
+ * Cambios respecto a la versión anterior:
+ *   - Imports actualizados: Link y useRouter desde "@/i18n/navigation"
+ *   - useTranslations agregado con varios namespaces
+ *   - validateField recibe `t` como parámetro
+ *   - El submitError ahora se traduce desde errorCode con tErrors
+ *   - PASSWORD_RULES.message reemplazado por PASSWORD_RULES.messageKey
+ *     resuelto con tPasswordRules(rule.messageKey)
+ *   - Todos los textos hardcoded traducidos:
+ *     * Labels: Nombre/Apellido/Email/Contraseña → First name/Last name/Email/Password
+ *     * Placeholder de email
+ *     * Botón "Crear cuenta" / "Creando cuenta..."
+ *     * Aria-labels de toggle password
+ *     * Toast de éxito
+ *     * Mensajes de validación inline
+ *     * Texto del checkbox de términos con rich text (2 links inline)
  *
- * Campos:
- *   - Nombre
- *   - Apellido
- *   - Email
- *   - Contraseña (con lista de requisitos visible en tiempo real)
- *   - Checkbox "Acepto términos y condiciones"
+ * Lo que NO cambia:
+ *   - Estructura visual: nombre+apellido en grid, email, password con
+ *     lista de requisitos en tiempo real, checkbox de términos
+ *   - Lista de requisitos con check verde / círculo gris en tiempo real
+ *   - Lógica de validación (onBlur, validateAll, error states)
+ *   - Redirección post-registro con ?redirect=
  *
- * Validación:
- *   - Nombre y apellido: mínimo 2 chars
- *   - Email: formato válido + no duplicado (lo verifica el hook al hacer submit)
- *   - Contraseña: cumple las 3 reglas (mínimo 8, una mayúscula, un número)
- *   - Términos: debe estar checked
+ * ─── PATRÓN PARA EL CHECKBOX DE TÉRMINOS ──────────────────────────────
  *
- * Feature destacado: lista de requisitos de contraseña visible.
- *   Mientras el usuario escribe, debajo del campo aparecen 3 líneas:
- *     ○ Mínimo 8 caracteres
- *     ○ Al menos una mayúscula
- *     ○ Al menos un número
- *   Cada línea cambia de gris (○) a verde con check (✓) cuando se cumple
- *   ese requisito. UX clave para reducir frustración.
+ * El texto del checkbox tiene 2 links inline:
+ *   "Acepto los [términos y condiciones] y la [política de privacidad]"
  *
- * Flujo post-registro:
- *   - El hook useAuth.register() crea la cuenta Y automáticamente
- *     inicia sesión.
- *   - Mostramos toast de bienvenida.
- *   - Redirigimos según ?redirect= o al home.
+ * Para mantener esos links bilingüe usamos t.rich() con dos componentes
+ * custom (terms y privacy) que envuelven los chunks de texto en <Link>.
  *
- * Sobre el banner de error genérico vs específico:
- *   Mismo patrón que LoginForm — si el registro falla (email duplicado, etc.),
- *   mostramos banner rojo con mensaje del backend.
- * ============================================================================
+ * La clave en messages.json es:
+ *   "termsLabel": "Acepto los <terms>términos y condiciones</terms> y la <privacy>política de privacidad</privacy>"
+ *
+ * En el JSX:
+ *   {t.rich("termsLabel", {
+ *     terms: (chunks) => <Link href="/terminos">{chunks}</Link>,
+ *     privacy: (chunks) => <Link href="/privacidad">{chunks}</Link>,
+ *   })}
+ *
+ * Esto permite que cada idioma reordene el texto si la sintaxis natural
+ * cambia (en inglés podría ser "I accept the [terms] and the [privacy
+ * policy]" con orden diferente).
+ *
+ * ─── PASSWORD_RULES CON messageKey ────────────────────────────────────
+ *
+ * Antes:
+ *   PASSWORD_RULES.map((rule, index) => (
+ *     <span>{rule.message}</span>
+ *   ))
+ *
+ * Ahora:
+ *   PASSWORD_RULES.map((rule, index) => (
+ *     <span>{tPasswordRules(rule.messageKey)}</span>
+ *   ))
+ *
+ * El rule.messageKey es uno de: "minChars" | "uppercase" | "number".
+ * tPasswordRules viene de useTranslations("auth.passwordRules").
+ *
+ * Cast a `any` necesario porque next-intl tipa estrictamente las claves;
+ * el messageKey de PasswordRule es del tipo unión, pero el lookup
+ * dinámico necesita el cast.
+ * ─────────────────────────────────────────────────────────────────────
  */
 
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, useRouter } from "@/i18n/navigation";
 import { Eye, EyeOff, AlertCircle, Check, Circle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
@@ -67,53 +98,55 @@ interface FormErrors {
 }
 
 /**
+ * Tipo liberal para t passed-in.
+ */
+type ValidateFn = (key: string) => string;
+
+/**
  * Validar un campo individual.
  *
- * Acepta el valor como `unknown` para manejar tanto strings (textos) como
- * boolean (checkbox). Internamente sabe qué esperar de cada campo según
- * su nombre.
+ * Cambio: recibe `t` para resolver los mensajes de error.
  */
 function validateField(
   field: keyof FormData,
-  value: unknown
+  value: unknown,
+  t: ValidateFn
 ): string | undefined {
   switch (field) {
     case "firstName":
       if (typeof value !== "string" || !value.trim()) {
-        return "El nombre es obligatorio";
+        return t("firstNameRequired");
       }
-      if (value.trim().length < 2) return "Mínimo 2 caracteres";
+      if (value.trim().length < 2) return t("minChars");
       return undefined;
 
     case "lastName":
       if (typeof value !== "string" || !value.trim()) {
-        return "El apellido es obligatorio";
+        return t("lastNameRequired");
       }
-      if (value.trim().length < 2) return "Mínimo 2 caracteres";
+      if (value.trim().length < 2) return t("minChars");
       return undefined;
 
     case "email": {
       if (typeof value !== "string" || !value.trim()) {
-        return "El email es obligatorio";
+        return t("emailRequired");
       }
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(value.trim())) return "Formato de email inválido";
+      if (!emailRegex.test(value.trim())) return t("emailInvalid");
       return undefined;
     }
 
     case "password":
       if (typeof value !== "string" || !value) {
-        return "La contraseña es obligatoria";
+        return t("passwordRequired");
       }
-      // No mostramos error específico aquí — los requisitos viven en la
-      // lista visual debajo del campo. Solo validamos que CUMPLA todas.
       if (!PASSWORD_RULES.every((rule) => rule.test(value))) {
-        return "La contraseña no cumple los requisitos";
+        return t("passwordInvalid");
       }
       return undefined;
 
     case "acceptTerms":
-      if (value !== true) return "Debes aceptar los términos para continuar";
+      if (value !== true) return t("acceptTermsRequired");
       return undefined;
 
     default:
@@ -125,6 +158,13 @@ export function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { register } = useAuth();
+
+  // 5 namespaces para los distintos tipos de textos
+  const tRegister = useTranslations("auth.register");
+  const tShared = useTranslations("auth.shared");
+  const tValidation = useTranslations("auth.validation");
+  const tErrors = useTranslations("auth.errors");
+  const tPasswordRules = useTranslations("auth.passwordRules");
 
   const [formData, setFormData] = useState<FormData>({
     firstName: "",
@@ -139,10 +179,6 @@ export function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  /**
-   * Helper para actualizar un campo. Limpia el error del campo si existía
-   * y también limpia el submitError global.
-   */
   const updateField = <K extends keyof FormData>(
     field: K,
     value: FormData[K]
@@ -154,14 +190,11 @@ export function RegisterForm() {
     if (submitError) setSubmitError(null);
   };
 
-  /**
-   * Validar todo el formulario.
-   */
   const validateAll = (): boolean => {
     const newErrors: FormErrors = {};
 
     (Object.keys(formData) as Array<keyof FormData>).forEach((field) => {
-      const error = validateField(field, formData[field]);
+      const error = validateField(field, formData[field], tValidation);
       if (error) newErrors[field] = error;
     });
 
@@ -185,14 +218,19 @@ export function RegisterForm() {
     });
 
     if (result.success) {
-      toast.success("¡Bienvenida a Katalina!", {
-        description: "Tu cuenta fue creada exitosamente",
+      toast.success(tRegister("toastSuccessTitle"), {
+        description: tRegister("toastSuccessDescription"),
       });
 
       const redirectTo = searchParams.get("redirect") ?? "/";
       router.push(redirectTo);
     } else {
-      setSubmitError(result.error ?? "Error al crear cuenta");
+      // Traducir el errorCode desde tErrors. Fallback genérico si no viene.
+      const errorMessage = result.errorCode
+        ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          tErrors(result.errorCode as any)
+        : tRegister("fallbackError");
+      setSubmitError(errorMessage);
       setIsSubmitting(false);
     }
   };
@@ -230,7 +268,7 @@ export function RegisterForm() {
             htmlFor="register-firstName"
             className="block text-sm font-medium mb-1.5"
           >
-            Nombre
+            {tRegister("firstNameLabel")}
           </label>
           <input
             id="register-firstName"
@@ -239,7 +277,11 @@ export function RegisterForm() {
             value={formData.firstName}
             onChange={(e) => updateField("firstName", e.target.value)}
             onBlur={() => {
-              const error = validateField("firstName", formData.firstName);
+              const error = validateField(
+                "firstName",
+                formData.firstName,
+                tValidation
+              );
               if (error) setErrors((prev) => ({ ...prev, firstName: error }));
             }}
             className={inputClass("firstName")}
@@ -256,7 +298,7 @@ export function RegisterForm() {
             htmlFor="register-lastName"
             className="block text-sm font-medium mb-1.5"
           >
-            Apellido
+            {tRegister("lastNameLabel")}
           </label>
           <input
             id="register-lastName"
@@ -265,7 +307,11 @@ export function RegisterForm() {
             value={formData.lastName}
             onChange={(e) => updateField("lastName", e.target.value)}
             onBlur={() => {
-              const error = validateField("lastName", formData.lastName);
+              const error = validateField(
+                "lastName",
+                formData.lastName,
+                tValidation
+              );
               if (error) setErrors((prev) => ({ ...prev, lastName: error }));
             }}
             className={inputClass("lastName")}
@@ -284,7 +330,7 @@ export function RegisterForm() {
           htmlFor="register-email"
           className="block text-sm font-medium mb-1.5"
         >
-          Email
+          {tRegister("emailLabel")}
         </label>
         <input
           id="register-email"
@@ -294,10 +340,10 @@ export function RegisterForm() {
           value={formData.email}
           onChange={(e) => updateField("email", e.target.value)}
           onBlur={() => {
-            const error = validateField("email", formData.email);
+            const error = validateField("email", formData.email, tValidation);
             if (error) setErrors((prev) => ({ ...prev, email: error }));
           }}
-          placeholder="tu@email.com"
+          placeholder={tShared("emailPlaceholder")}
           className={inputClass("email")}
         />
         {errors.email && (
@@ -307,15 +353,13 @@ export function RegisterForm() {
         )}
       </div>
 
-      {/*
-       * Contraseña con lista de requisitos en tiempo real.
-       */}
+      {/* Contraseña con lista de requisitos */}
       <div>
         <label
           htmlFor="register-password"
           className="block text-sm font-medium mb-1.5"
         >
-          Contraseña
+          {tRegister("passwordLabel")}
         </label>
 
         <div className="relative">
@@ -326,13 +370,10 @@ export function RegisterForm() {
             value={formData.password}
             onChange={(e) => updateField("password", e.target.value)}
             onBlur={() => {
-              // Solo mostramos error de password si está vacío.
-              // Si tiene contenido pero no cumple reglas, la lista visual
-              // ya comunica eso; no necesitamos texto rojo adicional.
               if (!formData.password) {
                 setErrors((prev) => ({
                   ...prev,
-                  password: "La contraseña es obligatoria",
+                  password: tValidation("passwordRequired"),
                 }));
               }
             }}
@@ -343,7 +384,9 @@ export function RegisterForm() {
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             aria-label={
-              showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
+              showPassword
+                ? tShared("hidePassword")
+                : tShared("showPassword")
             }
             tabIndex={-1}
             className={cn(
@@ -360,13 +403,11 @@ export function RegisterForm() {
         </div>
 
         {/*
-         * Lista de requisitos de contraseña.
+         * Lista de requisitos de contraseña en tiempo real.
          *
-         * Cada regla se evalúa contra el valor actual del input.
-         * Si la regla pasa → check verde, si no pasa → círculo gris.
-         *
-         * Esto da feedback inmediato sin necesidad de mostrar errores rojos.
-         * El usuario sabe qué le falta y lo va completando.
+         * Cada regla tiene un messageKey que resolvemos con tPasswordRules.
+         * Cast a `any` necesario porque el messageKey es un union literal
+         * pero next-intl espera claves específicas en tiempo de compilación.
          */}
         <ul className="mt-2 space-y-1">
           {PASSWORD_RULES.map((rule, index) => {
@@ -385,7 +426,8 @@ export function RegisterForm() {
                 ) : (
                   <Circle className="h-3 w-3 flex-shrink-0" />
                 )}
-                <span>{rule.message}</span>
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                <span>{tPasswordRules(rule.messageKey as any)}</span>
               </li>
             );
           })}
@@ -411,21 +453,29 @@ export function RegisterForm() {
             onChange={(e) => updateField("acceptTerms", e.target.checked)}
             className="h-4 w-4 mt-0.5 accent-secondary cursor-pointer flex-shrink-0"
           />
+          {/*
+           * Texto del checkbox con 2 links inline usando t.rich().
+           * El idioma controla el orden de las palabras alrededor de los links.
+           */}
           <span className="text-xs text-muted-foreground leading-relaxed">
-            Acepto los{" "}
-            <Link
-              href="/terminos"
-              className="text-foreground underline underline-offset-2 hover:text-accent transition-colors"
-            >
-              términos y condiciones
-            </Link>{" "}
-            y la{" "}
-            <Link
-              href="/privacidad"
-              className="text-foreground underline underline-offset-2 hover:text-accent transition-colors"
-            >
-              política de privacidad
-            </Link>
+            {tRegister.rich("termsLabel", {
+              terms: (chunks) => (
+                <Link
+                  href="/terminos"
+                  className="text-foreground underline underline-offset-2 hover:text-accent transition-colors"
+                >
+                  {chunks}
+                </Link>
+              ),
+              privacy: (chunks) => (
+                <Link
+                  href="/privacidad"
+                  className="text-foreground underline underline-offset-2 hover:text-accent transition-colors"
+                >
+                  {chunks}
+                </Link>
+              ),
+            })}
           </span>
         </label>
         {errors.acceptTerms && (
@@ -442,7 +492,7 @@ export function RegisterForm() {
         disabled={isSubmitting}
         className="w-full"
       >
-        {isSubmitting ? "Creando cuenta..." : "Crear cuenta"}
+        {isSubmitting ? tRegister("submitting") : tRegister("submitButton")}
       </Button>
     </form>
   );

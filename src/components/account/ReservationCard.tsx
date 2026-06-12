@@ -1,36 +1,40 @@
 /**
  * ============================================================================
- * RESERVATION CARD — KATALINA (Fase 12 Turno 3B.3: bilingüe)
+ * RESERVATION CARD — KATALINA (Fase 12 Turno 3B.4: timeRemaining bilingüe)
  * ============================================================================
  *
  * Cambios respecto a la versión anterior:
- *   - import Link cambia de "next/link" a "@/i18n/navigation"
- *   - Agregado useLocale + useTranslations
- *   - Todos los textos hardcoded traducidos (status badges, montos, botones,
- *     diálogo de confirmación, mensajes terminales, toast)
- *   - Date formatting con locale dinámico: en /es usa "es-MX" (1 de mayo
- *     de 2026), en /en usa "en-US" (May 1, 2026)
- *   - El texto de confirmación de cancelación usa t.rich() para mantener
- *     el <strong> del monto
+ *   - ActiveContent ahora pasa `t` a `formatTimeRemaining(reservation, t)`.
+ *     El `t` viene del namespace "reservation.card.active.timeRemaining".
  *
  * Lo que NO cambia:
- *   - reservation.product.name ya es string (gracias al fix de raíz en
- *     ReservationModal). NO necesita getLocalized.
- *   - Lógica del tick clock, contador regresivo, status efectivo
- *   - Animaciones, colores, layout
+ *   - Toda la estructura visual del card
+ *   - StatusBadge, ActiveContent, CompletedContent, TerminalContent
+ *   - El formateo de fechas con Intl.DateTimeFormat según locale
+ *   - Las traducciones de status, montos, botones, etc.
+ *   - El comportamiento del tick clock cada 60 segundos
  *
- * Sobre el formatTimeRemaining:
- *   Esta función está en types/reservation.ts y devuelve un string como
- *   "4 días" o "2 días 6 horas". Probablemente está hardcoded en español.
+ * ─── DETALLE DEL CAMBIO ────────────────────────────────────────────────
  *
- *   Para mantener este turno enfocado, NO refactorizamos esa función ahora
- *   (sería un quinto archivo y nos desviamos). El contador seguirá
- *   mostrándose en español incluso en /en. Es un detalle menor que
- *   podemos pulir en un mini-turno aparte.
+ * ActiveContent ya tiene `useTranslations("reservation.card.active")`
+ * pero esa función solo resuelve claves bajo "active" (expiresIn, depositPaid,
+ * remaining, etc.). Para resolver claves bajo "active.timeRemaining.*"
+ * (expired, day, days, hour, hours, minute, minutes) necesitamos un t
+ * separado.
  *
- *   Si quieres traducirlo, hay que hacer formatTimeRemaining() recibir
- *   el locale como parámetro y mapear las unidades (días/days, horas/hours).
- * ============================================================================
+ * Por qué un t separado en vez de extender el t actual:
+ *   - useTranslations(namespace) devuelve un t que solo resuelve dentro
+ *     de ese namespace exacto. No puedes hacer t("timeRemaining.day").
+ *   - Tenemos 2 opciones:
+ *     A) Subir un nivel: useTranslations("reservation.card.active") y
+ *        usar t("timeRemaining.day"). PROBLEMA: cambia todas las llamadas
+ *        existentes (t("expiresIn") deja de funcionar).
+ *     B) Llamar useTranslations 2 veces con namespaces diferentes:
+ *        tActive("expiresIn") y tTime("day"). ← Elegida
+ *
+ * El costo de llamar useTranslations 2 veces es cero (es solo lookup en
+ * un contexto React). Más limpio que refactorizar todas las claves.
+ * ─────────────────────────────────────────────────────────────────────
  */
 
 "use client";
@@ -59,10 +63,6 @@ interface ReservationCardProps {
 }
 
 export function ReservationCard({ reservation }: ReservationCardProps) {
-  /**
-   * Tick cada minuto para que el contador "Expira en X" se actualice
-   * sin recargar la página.
-   */
   useTickClock(60_000);
 
   const t = useTranslations("reservation.card");
@@ -78,7 +78,6 @@ export function ReservationCard({ reservation }: ReservationCardProps) {
       )}
     >
       <div className="flex gap-4">
-        {/* Imagen del producto */}
         <Link
           href={`/productos/${reservation.product.slug}`}
           className={cn(
@@ -98,9 +97,7 @@ export function ReservationCard({ reservation }: ReservationCardProps) {
           </div>
         </Link>
 
-        {/* Info + acciones */}
         <div className="flex-1 min-w-0">
-          {/* Header con badge de estado + nombre */}
           <div className="flex items-start justify-between gap-3 mb-2">
             <div className="min-w-0">
               <StatusBadge status={status} />
@@ -108,11 +105,6 @@ export function ReservationCard({ reservation }: ReservationCardProps) {
                 href={`/productos/${reservation.product.slug}`}
                 className="hover:text-accent transition-colors"
               >
-                {/*
-                 * reservation.product.name ya es string gracias al fix
-                 * de raíz aplicado en ReservationModal. Por eso lo
-                 * podemos renderizar directo sin getLocalized.
-                 */}
                 <h3 className="font-display text-lg font-medium leading-tight mt-1">
                   {reservation.product.name}
                 </h3>
@@ -120,7 +112,6 @@ export function ReservationCard({ reservation }: ReservationCardProps) {
             </div>
           </div>
 
-          {/* Contenido variable según estado */}
           {status === "active" && <ActiveContent reservation={reservation} />}
           {status === "completed" && (
             <CompletedContent reservation={reservation} />
@@ -134,11 +125,6 @@ export function ReservationCard({ reservation }: ReservationCardProps) {
   );
 }
 
-/**
- * StatusBadge — pill coloreado según el estado.
- *
- * Cambio: las labels ahora vienen del namespace reservation.card.status.
- */
 function StatusBadge({ status }: { status: ReservationStatus }) {
   const t = useTranslations("reservation.card.status");
 
@@ -146,26 +132,13 @@ function StatusBadge({ status }: { status: ReservationStatus }) {
     ReservationStatus,
     { Icon: typeof Clock; className: string }
   > = {
-    active: {
-      Icon: Clock,
-      className: "bg-accent/10 text-accent",
-    },
-    completed: {
-      Icon: CheckCircle,
-      className: "bg-success/10 text-success",
-    },
-    expired: {
-      Icon: XCircle,
-      className: "bg-destructive/10 text-destructive",
-    },
-    cancelled: {
-      Icon: XCircle,
-      className: "bg-muted text-muted-foreground",
-    },
+    active: { Icon: Clock, className: "bg-accent/10 text-accent" },
+    completed: { Icon: CheckCircle, className: "bg-success/10 text-success" },
+    expired: { Icon: XCircle, className: "bg-destructive/10 text-destructive" },
+    cancelled: { Icon: XCircle, className: "bg-muted text-muted-foreground" },
   };
 
   const { Icon, className } = config[status];
-  // El label viene del namespace traducido (active/completed/expired/cancelled)
   const label = t(status);
 
   return (
@@ -184,9 +157,18 @@ function StatusBadge({ status }: { status: ReservationStatus }) {
 
 /**
  * ActiveContent — para apartados activos.
+ *
+ * Cambio principal: pasa tTime a formatTimeRemaining para que el contador
+ * "X días Y horas" se traduzca al locale activo.
  */
 function ActiveContent({ reservation }: { reservation: Reservation }) {
   const t = useTranslations("reservation.card.active");
+  /**
+   * Segundo t para el sub-namespace "timeRemaining".
+   * Sirve para resolver: expired, day, days, hour, hours, minute, minutes.
+   * Lo pasamos a formatTimeRemaining como parámetro.
+   */
+  const tTime = useTranslations("reservation.card.active.timeRemaining");
 
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -201,24 +183,24 @@ function ActiveContent({ reservation }: { reservation: Reservation }) {
 
   return (
     <>
-      {/* Contador regresivo */}
+      {/*
+       * Contador regresivo bilingüe.
+       *
+       * formatTimeRemaining(reservation, tTime) devuelve:
+       *   - "4 días 12 horas" en /es
+       *   - "4 days 12 hours" en /en
+       *   - "Expirado" / "Expired"
+       */}
       <p className="text-sm text-muted-foreground flex items-center gap-1.5 mb-3">
         <Clock className="h-3.5 w-3.5" />
         <span>
           {t("expiresIn")}{" "}
-          {/*
-           * formatTimeRemaining(reservation) devuelve "4 días" / "2 días 6 horas"
-           * en español (está en types/reservation.ts).
-           * En /en se mostrará igualmente en español. Es un detalle menor
-           * que podemos refactorizar en otro turno.
-           */}
           <strong className="text-foreground">
-            {formatTimeRemaining(reservation)}
+            {formatTimeRemaining(reservation, tTime)}
           </strong>
         </span>
       </p>
 
-      {/* Montos en grid de 2 columnas */}
       <div className="grid grid-cols-2 gap-3 text-sm mb-4">
         <div>
           <p className="text-xs text-muted-foreground">{t("depositPaid")}</p>
@@ -234,7 +216,6 @@ function ActiveContent({ reservation }: { reservation: Reservation }) {
         </div>
       </div>
 
-      {/* Botones de acción O confirmación de cancelación */}
       {!showCancelConfirm ? (
         <div className="flex flex-wrap gap-2">
           <Button
@@ -260,10 +241,6 @@ function ActiveContent({ reservation }: { reservation: Reservation }) {
             "bg-destructive/5"
           )}
         >
-          {/*
-           * Texto de confirmación con rich text para mantener <strong>
-           * envolviendo el monto del anticipo.
-           */}
           <p className="text-xs text-muted-foreground mb-3">
             {t.rich("confirmCancelText", {
               amount: formatPrice(reservation.depositAmount),
@@ -292,7 +269,6 @@ function ActiveContent({ reservation }: { reservation: Reservation }) {
         </div>
       )}
 
-      {/* Modal de completar pago */}
       <CompleteReservationModal
         reservation={reservation}
         isOpen={showCompleteModal}
@@ -302,13 +278,6 @@ function ActiveContent({ reservation }: { reservation: Reservation }) {
   );
 }
 
-/**
- * CompletedContent — para apartados completados exitosamente.
- *
- * Cambios:
- *   - Date formatting usa el locale activo (es-MX vs en-US)
- *   - Labels de método de entrega traducidos
- */
 function CompletedContent({ reservation }: { reservation: Reservation }) {
   const locale = useLocale() as Locale;
   const t = useTranslations("reservation.card.completed");
@@ -317,15 +286,6 @@ function CompletedContent({ reservation }: { reservation: Reservation }) {
   const Icon = isPickup ? Store : Truck;
   const methodLabel = isPickup ? t("pickup") : t("shipping");
 
-  /**
-   * Formatear fecha según el locale activo.
-   *   - Si locale === "es" → "1 de mayo de 2026"
-   *   - Si locale === "en" → "May 1, 2026"
-   *
-   * Mapeo de nuestro locale a códigos de Intl:
-   *   "es" → "es-MX" (mexicano específico)
-   *   "en" → "en-US" (americano por default)
-   */
   const intlLocale = locale === "es" ? "es-MX" : "en-US";
 
   const completedDate = reservation.completedAt
@@ -338,7 +298,6 @@ function CompletedContent({ reservation }: { reservation: Reservation }) {
 
   return (
     <>
-      {/* Total pagado */}
       <div className="mb-3">
         <p className="text-xs text-muted-foreground">{t("totalPaid")}</p>
         <p className="font-medium tabular-nums">
@@ -346,7 +305,6 @@ function CompletedContent({ reservation }: { reservation: Reservation }) {
         </p>
       </div>
 
-      {/* Método de entrega + fecha de completado */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
         <span className="flex items-center gap-1.5 text-muted-foreground">
           <Icon className="h-3.5 w-3.5" />
@@ -362,9 +320,6 @@ function CompletedContent({ reservation }: { reservation: Reservation }) {
   );
 }
 
-/**
- * TerminalContent — para apartados expirados o cancelados.
- */
 function TerminalContent({
   reservation,
   status,
@@ -389,4 +344,4 @@ function TerminalContent({
       </div>
     </>
   );
-} 
+}

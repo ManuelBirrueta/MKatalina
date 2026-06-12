@@ -1,43 +1,35 @@
 /**
  * ============================================================================
- * AUTH LAYOUT — KATALINA
+ * AUTH LAYOUT — KATALINA (Fase 12 Turno 3B.4: import locale-aware)
  * ============================================================================
  *
- * Wrapper compartido por las páginas /login y /registro.
+ * Cambios respecto a la versión anterior:
+ *   - import Link cambia de "next/link" a "@/i18n/navigation".
+ *     Esto asegura que el link de alternateAction (Regístrate / Inicia sesión)
+ *     respete el prefijo locale activo (/en/registro vs /es/registro).
  *
- * Estructura:
- *   ┌────────────────────────────────────────┐
- *   │  [Header del sitio se mantiene]        │
- *   ├────────────────────────────────────────┤
- *   │                                        │
- *   │                                        │
- *   │         ┌──────────────────┐          │
- *   │         │  [Eyebrow]        │          │
- *   │         │  Título h1        │          │
- *   │         │  Subtítulo        │          │
- *   │         │                   │          │
- *   │         │  [Formulario]     │          │
- *   │         │                   │          │
- *   │         │  ─── o ───         │          │
- *   │         │                   │          │
- *   │         │  [Google btn]     │          │
- *   │         │                   │          │
- *   │         │  Link a alterno   │          │
- *   │         └──────────────────┘          │
- *   │                                        │
- *   ├────────────────────────────────────────┤
- *   │  [Footer del sitio se mantiene]        │
- *   └────────────────────────────────────────┘
+ * Lo que NO cambia:
+ *   - El componente sigue siendo el mismo Server Component.
+ *   - Sigue recibiendo TODOS los textos por props (eyebrow, title, subtitle,
+ *     alternateAction). NO conoce traducciones.
+ *   - El padre (login/page.tsx, registro/page.tsx) le pasa los strings ya
+ *     traducidos. Patrón "el padre decide" preservado.
  *
- * El panel central tiene max-width de 440px (medida estándar para formularios
- * de auth — suficiente para que no se vea apretado pero no tanto que pierda
- * intimidad). Centrado horizontal y verticalmente en el espacio disponible.
+ * ─── POR QUÉ NO MIGRAMOS A useTranslations AQUÍ ────────────────────────
  *
- * Server Component — no necesita estado. Solo renderiza children.
- * ============================================================================
+ * AuthLayout es un wrapper genérico. Si en el futuro lo usamos también
+ * para una página de "recuperar contraseña" o "verificar email", queremos
+ * que siga siendo agnóstico al contenido — solo dibuja la estructura.
+ *
+ * Acoplarlo a auth.login/auth.register lo encierra a esos dos casos de uso.
+ * Mejor que cada página inyecte sus propios textos traducidos.
+ *
+ * Es el mismo principio que aplicamos en CategoryMegaMenu, ProductCard, etc.:
+ * componentes de presentación pura que reciben strings, no claves.
+ * ─────────────────────────────────────────────────────────────────────
  */
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { Container } from "@/components/layout/Container";
 import { cn } from "@/lib/utils";
 
@@ -53,11 +45,14 @@ interface AuthLayoutProps {
   /**
    * Link al modo alterno (si está en /login, link a /registro y viceversa).
    * Texto del prompt + texto del link + href.
+   *
+   * Importante: prompt y linkText deben venir ya traducidos al locale del usuario.
+   * Esa responsabilidad la tiene la página que monta este layout.
    */
   alternateAction: {
-    prompt: string; // ej. "¿No tienes cuenta?"
-    linkText: string; // ej. "Crea una"
-    href: string; // ej. "/registro"
+    prompt: string; // ej. "¿No tienes cuenta?" / "Don't have an account yet?"
+    linkText: string; // ej. "Regístrate" / "Sign up"
+    href: string; // ej. "/registro" (siempre español, decisión arquitectural)
   };
 }
 
@@ -70,14 +65,6 @@ export function AuthLayout({
 }: AuthLayoutProps) {
   return (
     <Container>
-      {/*
-       * Wrapper externo: ocupa al menos toda la pantalla menos header y footer
-       * para que el panel se sienta centrado visualmente.
-       *
-       * min-h-[calc(100vh-200px)] = altura mínima del viewport menos
-       * aproximadamente el alto combinado de header (60px) + footer (140px).
-       * Si el contenido es más alto, crece naturalmente con padding.
-       */}
       <div
         className={cn(
           "min-h-[calc(100vh-200px)]",
@@ -85,17 +72,8 @@ export function AuthLayout({
           "py-12 lg:py-20"
         )}
       >
-        {/*
-         * Panel del formulario.
-         *
-         * max-w-md (= 448px en Tailwind v4) cuando es solo el form.
-         * Padding generoso interno para que respire.
-         */}
         <div className="w-full max-w-md">
-          {/*
-           * Header del formulario: eyebrow + título + subtítulo.
-           * Centrado para enfatizar simetría visual del panel.
-           */}
+          {/* Header del formulario: eyebrow + título + subtítulo */}
           <header className="text-center mb-10">
             {eyebrow && (
               <p className="text-xs uppercase tracking-[0.3em] text-accent mb-3">
@@ -117,9 +95,7 @@ export function AuthLayout({
 
           {/*
            * Link al modo alterno.
-           *
-           * Border-t sutil arriba para separar visualmente del contenido
-           * principal sin gritar. Centrado horizontalmente.
+           * Link de @/i18n/navigation mantiene el prefijo locale automáticamente.
            */}
           <div className="mt-10 pt-6 border-t border-border text-center">
             <p className="text-sm text-muted-foreground">

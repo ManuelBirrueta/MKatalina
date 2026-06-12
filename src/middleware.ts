@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * MIDDLEWARE — KATALINA
+ * MIDDLEWARE — MKATALINA
  * ============================================================================
  *
  * El middleware de Next.js se ejecuta antes de cada request. Acá lo usamos

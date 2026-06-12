@@ -1,36 +1,47 @@
 /**
  * ============================================================================
- * MOCK USERS — KATALINA (solo para desarrollo)
+ * MOCK USERS — MKATALINA (Fase 12 Turno 3B.4: PASSWORD_RULES bilingüe)
  * ============================================================================
  *
- * "Base de datos" simulada de usuarios para el sistema de auth en frontend.
+ * Cambios respecto a la versión anterior:
+ *   - `PASSWORD_RULES` ahora usa `messageKey: string` en lugar de
+ *     `message: string`. La key sirve como índice contra el namespace
+ *     "auth.passwordRules.{messageKey}" en messages.json.
  *
- * ⚠️ ADVERTENCIA DE SEGURIDAD ⚠️
- * Las contraseñas aquí están en TEXTO PLANO. Esto es INSEGURO y NO debe
- * hacerse en producción. Cuando integremos NextAuth en Fase 12:
- *   - Las contraseñas se almacenan en backend como hashes (bcrypt/argon2)
- *   - El cliente envía la contraseña en texto plano vía HTTPS al backend
- *   - El backend hashea la contraseña recibida y la compara con el hash guardado
- *   - El cliente NUNCA ve las contraseñas hasheadas
+ * Lo que NO cambia:
+ *   - Todos los demás tipos, constantes, funciones helper
+ *   - MOCK_USERS hardcoded con credenciales de prueba
+ *   - findUserByEmail, validateCredentials, stripPassword, isPasswordValid
+ *   - Las reglas de validación reales (length >= 8, regex de mayúscula y número)
  *
- * Por qué texto plano aquí entonces:
- *   - Es una simulación de UI, no un sistema real
- *   - Necesitamos comparar contraseñas para que el login "funcione"
- *   - Los usuarios mock son temporales y desaparecen en Fase 12
+ * ─── POR QUÉ messageKey EN VEZ DE message ──────────────────────────────
  *
- * Estos usuarios son INMUTABLES — siempre existen con las mismas credenciales.
- * Los usuarios que se registran vía /registro se guardan en localStorage
- * (no aquí) para preservar la separación entre data "del producto" y data
- * "del navegador del usuario".
- * ============================================================================
+ * El objetivo: el componente que muestra las reglas (RegisterForm) puede
+ * traducir cada regla al locale activo usando t(`auth.passwordRules.${key}`).
+ *
+ * Alternativas consideradas:
+ *
+ *   A) Mantener message: string y cambiarlo a LocalizedString {es, en}.
+ *      Problema: este archivo es data/lógica, no UI. Acoplar i18n aquí
+ *      sería filtrar responsabilidad de capas.
+ *
+ *   B) Hardcodear los strings en RegisterForm, ignorando PASSWORD_RULES.
+ *      Problema: rompe el contrato "una sola fuente de verdad para las
+ *      reglas". Si agregamos una regla nueva, hay que tocarlo en 2 lados.
+ *
+ *   C) Cambiar a messageKey (esta opción).
+ *      ✓ Mantiene separación: data/lógica vs UI/i18n
+ *      ✓ Una sola fuente de verdad: PASSWORD_RULES es el array maestro
+ *      ✓ RegisterForm resuelve con t(rule.messageKey)
+ *      ✓ Agregar una regla nueva = agregar entry aquí + entry en messages.json
+ *
+ * Patrón consistente con cómo refactorizamos shipping methods, status badges,
+ * y otras "data tables" del proyecto.
+ * ─────────────────────────────────────────────────────────────────────
  */
 
 /**
- * MockUserCredentials — combina datos del usuario + contraseña.
- *
- * En backend real, las contraseñas viven en su propia tabla aparte (o como
- * campo separado de la tabla users) y NUNCA se devuelven al cliente en las
- * respuestas del API.
+ * MockUserCredentials — sin cambios.
  */
 export interface MockUserCredentials {
   id: string;
@@ -39,16 +50,11 @@ export interface MockUserCredentials {
   password: string;
   firstName: string;
   lastName: string;
-  /** Fecha de creación del usuario en formato ISO */
   createdAt: string;
 }
 
 /**
- * AuthUser — los datos del usuario que se exponen a la UI.
- *
- * Importante: NO incluye la contraseña. Cuando el usuario inicia sesión,
- * el store guarda este tipo (no MockUserCredentials), garantizando que
- * la contraseña no se filtre accidentalmente a componentes que la usan.
+ * AuthUser — sin cambios.
  */
 export interface AuthUser {
   id: string;
@@ -59,40 +65,20 @@ export interface AuthUser {
 }
 
 /**
- * Función helper para convertir MockUserCredentials a AuthUser
- * removiendo la contraseña.
- *
- * Esto se llama después de validar credenciales exitosamente. La separación
- * de tipos garantiza que solo después de validación correcta el usuario
- * "se vuelve" un AuthUser sin password.
+ * stripPassword — sin cambios.
  */
 export function stripPassword(user: MockUserCredentials): AuthUser {
-  // Destructuring para quitar password sin mutar el objeto original.
-  // El `_password` indica explícitamente que estamos descartando ese campo.
   const { password: _password, ...authUser } = user;
   return authUser;
 }
 
 /**
- * MOCK_USERS — los usuarios pre-cargados para pruebas.
- *
- * 3 usuarios con perfiles distintos para que puedas probar:
- *   - maria@katalina.mx → contraseña "Demo1234" → usuaria estándar
- *   - juan@katalina.mx → contraseña "Test5678" → otro usuario para validar
- *     que la sesión es por-usuario (no global)
- *   - admin@katalina.mx → contraseña "Admin999" → reservada para cuando
- *     implementemos roles en Fase 11 (admin panel). Por ahora se comporta
- *     como usuario regular.
- *
- * Las contraseñas siguen estas reglas (que también validaremos en /registro):
- *   - Mínimo 8 caracteres
- *   - Al menos 1 mayúscula
- *   - Al menos 1 número
+ * MOCK_USERS — sin cambios.
  */
 export const MOCK_USERS: MockUserCredentials[] = [
   {
     id: "user-mock-001",
-    email: "maria@katalina.mx",
+    email: "maria@mkatalina.mx",
     password: "Demo1234",
     firstName: "María",
     lastName: "López",
@@ -100,7 +86,7 @@ export const MOCK_USERS: MockUserCredentials[] = [
   },
   {
     id: "user-mock-002",
-    email: "juan@katalina.mx",
+    email: "juan@mkatalina.mx",
     password: "Test5678",
     firstName: "Juan",
     lastName: "Hernández",
@@ -108,35 +94,22 @@ export const MOCK_USERS: MockUserCredentials[] = [
   },
   {
     id: "user-mock-003",
-    email: "admin@katalina.mx",
+    email: "admin@mkatalina.mx",
     password: "Admin999",
     firstName: "Admin",
-    lastName: "Katalina",
+    lastName: "MKatalina",
     createdAt: "2026-01-01T00:00:00.000Z",
   },
 ];
 
 /**
- * findUserByEmail — busca un usuario por su email (case-insensitive).
- *
- * Combina los usuarios pre-cargados (MOCK_USERS) con los registrados
- * vía /registro que viven en localStorage. El parámetro `registeredUsers`
- * lo pasa el store cuando llama a esta función — así mantenemos esta
- * función pura sin acoplarla a localStorage directamente.
- *
- * Devuelve `null` si no existe — los componentes deben manejar ese caso
- * (mostrar "email no encontrado" o similar).
+ * findUserByEmail — sin cambios.
  */
 export function findUserByEmail(
   email: string,
   registeredUsers: MockUserCredentials[] = []
 ): MockUserCredentials | null {
-  // Normalizar el email a minúsculas + trim para que "MARIA@..." y
-  // "maria@..." y "maria@... " encuentren el mismo usuario.
-  // Es como se hace en backend real (la columna email es case-insensitive).
   const normalized = email.trim().toLowerCase();
-
-  // Buscar primero en pre-cargados, después en registrados.
   const allUsers = [...MOCK_USERS, ...registeredUsers];
   return (
     allUsers.find((user) => user.email.toLowerCase() === normalized) ?? null
@@ -144,17 +117,7 @@ export function findUserByEmail(
 }
 
 /**
- * validateCredentials — valida email + contraseña contra la base mock.
- *
- * Devuelve:
- *   - El usuario (sin contraseña) si las credenciales son correctas
- *   - null si email no existe O contraseña incorrecta
- *
- * IMPORTANTE: no diferenciamos entre "email no existe" y "contraseña
- * incorrecta" en el mensaje al usuario. Esta es una práctica de seguridad
- * estándar — si dijéramos "el email no está registrado" estaríamos
- * revelando qué emails SÍ existen, lo cual ayuda a atacantes a enumerar
- * usuarios. Aunque aquí es solo mock, mantenemos la práctica correcta.
+ * validateCredentials — sin cambios.
  */
 export function validateCredentials(
   email: string,
@@ -163,43 +126,60 @@ export function validateCredentials(
 ): AuthUser | null {
   const user = findUserByEmail(email, registeredUsers);
 
-  // Email no existe O contraseña no coincide → null genérico
   if (!user || user.password !== password) {
     return null;
   }
 
-  // Credenciales correctas → devolver usuario SIN contraseña
   return stripPassword(user);
 }
 
 /**
- * Reglas de validación de contraseña para usar en /registro.
+ * PasswordRule — estructura de una regla de validación de contraseña.
  *
- * Exportamos un array de objetos con regla + mensaje para que el formulario
- * pueda mostrar cada requisito y marcarlo como cumplido en tiempo real
- * (UX típica de "lista de requisitos que se van marcando con check").
+ * Cambio: `message: string` → `messageKey: string`.
  *
- * En backend real estas mismas reglas se validan server-side. Tener las
- * reglas en un objeto compartido permitiría reutilizarlas, pero como aquí
- * estamos solo en frontend, viven nada más en este archivo.
+ * El messageKey es la sub-key dentro del namespace
+ * "auth.passwordRules" en messages.json:
+ *   - "minChars" → "Mínimo 8 caracteres" / "Minimum 8 characters"
+ *   - "uppercase" → "Al menos una mayúscula" / "At least one uppercase letter"
+ *   - "number" → "Al menos un número" / "At least one number"
+ *
+ * El componente que muestra las reglas resuelve:
+ *   t(`auth.passwordRules.${rule.messageKey}`)
  */
-export const PASSWORD_RULES = [
+export interface PasswordRule {
+  /** Función que valida si una contraseña cumple la regla */
+  test: (password: string) => boolean;
+  /** Clave de traducción bajo "auth.passwordRules.*" en messages.json */
+  messageKey: "minChars" | "uppercase" | "number";
+}
+
+/**
+ * Reglas de validación de contraseña.
+ *
+ * Cada regla:
+ *   - test: función que valida (sin cambios respecto a la versión anterior)
+ *   - messageKey: clave bajo "auth.passwordRules.*" para resolver el texto
+ *
+ * En backend real estas mismas reglas se validan server-side.
+ */
+export const PASSWORD_RULES: PasswordRule[] = [
   {
     test: (password: string) => password.length >= 8,
-    message: "Mínimo 8 caracteres",
+    messageKey: "minChars",
   },
   {
     test: (password: string) => /[A-Z]/.test(password),
-    message: "Al menos una mayúscula",
+    messageKey: "uppercase",
   },
   {
     test: (password: string) => /[0-9]/.test(password),
-    message: "Al menos un número",
+    messageKey: "number",
   },
 ];
 
 /**
- * isPasswordValid — true si la contraseña cumple TODAS las reglas.
+ * isPasswordValid — sin cambios. Sigue validando contra TODAS las reglas.
  */
 export function isPasswordValid(password: string): boolean {
   return PASSWORD_RULES.every((rule) => rule.test(password));

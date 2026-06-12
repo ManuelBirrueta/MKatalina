@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * REVIEWS DATA — KATALINA (mock)
+ * REVIEWS DATA — MKATALINA (mock + rebrand)
  * ============================================================================
  * Mock data para probar todos los estados visuales:
  *   - aretes-camelia: 4 reseñas (ratings altos)
@@ -9,6 +9,20 @@
  *   - gargantilla-ofelia: 2 reseñas
  *   - collar-amatista: 1 reseña
  *   - Resto: 0 reseñas (caso "Aún no hay reseñas")
+ *
+ * Cambio respecto a la versión anterior (rebrand):
+ *   - rev-011 (Mariana D): comentario menciona "el sello de MKatalina"
+ *     en lugar de "el sello de Katalina"
+ *
+ * Nota sobre reseñas mock:
+ *   En un sistema real, las reseñas son contenido generado por usuarios
+ *   y NO se modifican retroactivamente cuando cambia el nombre de la marca.
+ *   Sin embargo, estos son mocks de desarrollo creados por nosotros, por lo
+ *   que mantenerlos coherentes con el branding actual es lo correcto.
+ *
+ *   Cuando llegue el backend real, las reseñas que un cliente real haya
+ *   escrito mencionando "Katalina" SE QUEDARÍAN como están (es la voz
+ *   del cliente, no del sitio).
  * ============================================================================
  */
 
@@ -157,8 +171,9 @@ export const reviewsData: Review[] = [
     userName: "Mariana D.",
     rating: 5,
     title: "Perfecta para regalo",
+    // Mención rebrandeada: "el sello de Katalina" → "el sello de MKatalina"
     comment:
-      "Compré 2 para regalar y a las dos personas les fascinó. La caja con el sello de Katalina hace que se vea aún más especial.",
+      "Compré 2 para regalar y a las dos personas les fascinó. La caja con el sello de MKatalina hace que se vea aún más especial.",
     createdAt: "2026-03-28T14:20:00.000Z",
     verified: true,
     helpful: 6,

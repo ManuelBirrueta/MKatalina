@@ -1,29 +1,98 @@
 /**
  * ============================================================================
- * HEADER — KATALINA (Fase 12 fix: arreglo de tipos MobileNav)
+ * HEADER — MKATALINA (Fase 12 Turno 3B.4: mega menú bilingüe)
  * ============================================================================
  *
  * Cambios respecto a la versión anterior:
- *   - Construimos un array `translatedCategories` que tiene `label` (string
- *     ya traducido), no `labelKey`. Esto satisface el contrato de MobileNav
- *     que NO está internamente traducido aún.
- *   - El array original (con labelKey) se sigue usando para el nav desktop
- *     porque dentro del mismo componente tenemos acceso a tNav.
+ *   - El array `navCategories` se refactorizó: ahora solo guarda IDs estables
+ *     (labelKey, slug, hrefs, src de imagen). NO contiene textos.
+ *   - Todo el contenido del mega menú (eyebrow, title, description, columnas,
+ *     links, alt, ctaLabel) se construye en runtime con useTranslations dentro
+ *     de un useMemo, leyendo del nuevo namespace "header.megaMenu.*".
+ *   - El componente CategoryMegaMenu queda INTACTO: sigue recibiendo
+ *     MegaMenuContent como prop con strings ya resueltos. Su contrato no cambia.
  *
- * Por qué este patrón:
- *   MobileNav es un componente "consumidor" que solo muestra los datos
- *   que le pasamos. No tiene useTranslations dentro (esa es la idea —
- *   responsabilidad única). El padre (Header) le pasa datos ya listos.
+ * Lo que NO cambia:
+ *   - Toda la lógica visual del header (sticky, scroll, hoveredCategory)
+ *   - El handling de wishlist con badge
+ *   - El patrón de pasar `translatedCategoriesForMobile` a MobileNav
+ *   - Los hrefs (siempre en español: /aretes, /aretes/minimalistas, etc.)
  *
- *   Una alternativa habría sido reescribir MobileNav para que también
- *   use translations, pero como no tenemos visibilidad de cómo está
- *   construido, mejor preservamos su contrato actual.
+ * ─── ARQUITECTURA DEL REFACTOR ────────────────────────────────────────
+ *
+ * ANTES (todo hardcoded en español):
+ *   const navCategories = [
+ *     {
+ *       labelKey: "earrings",
+ *       href: "/aretes",
+ *       content: {
+ *         eyebrow: "Categoría",
+ *         title: "Aretes",
+ *         description: "Desde minimalistas...",
+ *         columns: [
+ *           { title: "Por estilo", links: [
+ *             { label: "Minimalistas", href: "..." },
+ *             ...
+ *           ]},
+ *           ...
+ *         ],
+ *         featuredImage: { src: "...", alt: "Colección de aretes Katalina" },
+ *         ctaLabel: "Ver toda la colección de aretes",
+ *         ctaHref: "/aretes",
+ *       }
+ *     },
+ *     ...
+ *   ];
+ *
+ * AHORA (data minimal sin textos):
+ *   const navCategoriesData = [
+ *     {
+ *       labelKey: "earrings",            // nav.earrings
+ *       categoryId: "Aretes",            // product.categories.Aretes
+ *       href: "/aretes",
+ *       imageSrc: "/placeholder-aretes.jpg",
+ *       columns: [
+ *         { titleKey: "byStyle", linkGroup: "earringsStyle", links: [
+ *           { linkKey: "minimalist", href: "/aretes/minimalistas" },
+ *           ...
+ *         ]},
+ *         ...
+ *       ]
+ *     }
+ *   ];
+ *
+ *   Y dentro del componente, un useMemo construye el array final
+ *   resolviendo todos los textos con t().
+ *
+ * ─── POR QUÉ useMemo ──────────────────────────────────────────────────
+ *
+ * El array `navCategories` traducido depende de:
+ *   - tNav (de "nav")
+ *   - tMega (de "header.megaMenu")
+ *   - tCategories (de "product.categories")
+ *
+ * Cada render del componente, estas funciones t() pueden cambiar de
+ * referencia (next-intl las recrea internamente). Con useMemo:
+ *   - Solo se reconstruye el array cuando cambian las funciones t
+ *     (típicamente: cuando cambia el locale)
+ *   - Optimiza performance evitando reconstruir 4 categorías × ~13 textos
+ *     en cada hover sobre un link del header.
+ *
+ * ─── REUTILIZACIÓN DE NAMESPACES ──────────────────────────────────────
+ *
+ *   - product.categories.{Enum} → para "Aretes/Earrings", "Collares/...", etc.
+ *     en title del mega menú. Misma fuente que ProductCard, breadcrumbs, etc.
+ *   - nav.{earrings|necklaces|...} → para el label del link en navegación.
+ *     Misma fuente que el desktop nav y MobileNav.
+ *   - header.megaMenu.* → para los textos PROPIOS del mega menú: eyebrow,
+ *     descriptions, columnTitles, links (estilos/largos/etc.), ctaLabel, alt.
+ * ─────────────────────────────────────────────────────────────────────
  * ============================================================================
  */
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { Search, Heart } from "lucide-react";
@@ -42,166 +111,165 @@ import { useWishlist } from "@/hooks/use-wishlist";
 import { cn } from "@/lib/utils";
 
 /**
- * Tipo "interno" usado dentro de este componente.
+ * Tipo "interno" para los datos crudos sin traducir.
  *
- * labelKey se traduce en runtime al label final que se le pasa a MobileNav.
+ * Cada categoría guarda solo los IDs estables (no traducibles) que
+ * usaremos para resolver textos contra messages.json.
+ *
+ * - labelKey: clave bajo "nav.*" para el label del link
+ * - categoryId: clave bajo "product.categories.*" para el title del mega menú
+ *               y también bajo "header.megaMenu.descriptions.*"
+ * - href: ruta del catálogo (siempre en español, decisión arquitectural)
+ * - imageSrc: ruta del placeholder de imagen
+ * - columns: array con 2 columnas. Cada una tiene:
+ *     - titleKey: clave bajo "header.megaMenu.columnTitles.*"
+ *     - linkGroup: clave bajo "header.megaMenu.links.*" (el grupo entero)
+ *     - links: array de { linkKey, href } donde linkKey es la sub-key
+ *              dentro del grupo
  */
-interface NavCategoryInternal {
+interface NavCategoryData {
   labelKey: "earrings" | "necklaces" | "bracelets" | "chokers";
+  categoryId: "Aretes" | "Collares" | "Pulseras" | "Gargantillas";
   href: string;
-  content: MegaMenuContent;
+  imageSrc: string;
+  columns: Array<{
+    titleKey: "byStyle" | "byMaterial" | "byLength" | "byType" | "byOccasion";
+    linkGroup: string;
+    links: Array<{ linkKey: string; href: string }>;
+  }>;
 }
 
-const navCategories: NavCategoryInternal[] = [
+/**
+ * Data CRUDA del mega menú: solo IDs y URLs. Los textos visibles se
+ * resuelven dentro del componente con useTranslations.
+ */
+const navCategoriesData: NavCategoryData[] = [
   {
     labelKey: "earrings",
+    categoryId: "Aretes",
     href: "/aretes",
-    content: {
-      eyebrow: "Categoría",
-      title: "Aretes",
-      description:
-        "Desde minimalistas para uso diario hasta piezas statement para ocasiones especiales.",
-      columns: [
-        {
-          title: "Por estilo",
-          links: [
-            { label: "Minimalistas", href: "/aretes/minimalistas" },
-            { label: "Statement", href: "/aretes/statement" },
-            { label: "Vintage", href: "/aretes/vintage" },
-            { label: "Étnicos", href: "/aretes/etnicos" },
-          ],
-        },
-        {
-          title: "Por material",
-          links: [
-            { label: "Plata 925", href: "/aretes/plata-925" },
-            { label: "Oro rosa", href: "/aretes/oro-rosa" },
-            { label: "Acero quirúrgico", href: "/aretes/acero" },
-            { label: "Piedras naturales", href: "/aretes/piedras-naturales" },
-          ],
-        },
-      ],
-      featuredImage: {
-        src: "/placeholder-aretes.jpg",
-        alt: "Colección de aretes Katalina",
+    imageSrc: "/placeholder-aretes.jpg",
+    columns: [
+      {
+        titleKey: "byStyle",
+        linkGroup: "earringsStyle",
+        links: [
+          { linkKey: "minimalist", href: "/aretes/minimalistas" },
+          { linkKey: "statement", href: "/aretes/statement" },
+          { linkKey: "vintage", href: "/aretes/vintage" },
+          { linkKey: "ethnic", href: "/aretes/etnicos" },
+        ],
       },
-      ctaLabel: "Ver toda la colección de aretes",
-      ctaHref: "/aretes",
-    },
+      {
+        titleKey: "byMaterial",
+        linkGroup: "earringsMaterial",
+        links: [
+          { linkKey: "silver925", href: "/aretes/plata-925" },
+          { linkKey: "roseGold", href: "/aretes/oro-rosa" },
+          { linkKey: "surgicalSteel", href: "/aretes/acero" },
+          { linkKey: "naturalStones", href: "/aretes/piedras-naturales" },
+        ],
+      },
+    ],
   },
   {
     labelKey: "necklaces",
+    categoryId: "Collares",
     href: "/collares",
-    content: {
-      eyebrow: "Categoría",
-      title: "Collares",
-      description:
-        "Cadenas finas, dijes personalizables y collares de declaración para complementar cada outfit.",
-      columns: [
-        {
-          title: "Por largo",
-          links: [
-            { label: "Choker (35-40 cm)", href: "/collares/choker" },
-            { label: "Princesa (45-50 cm)", href: "/collares/princesa" },
-            { label: "Matinée (55-60 cm)", href: "/collares/matinee" },
-            { label: "Largos (+70 cm)", href: "/collares/largos" },
-          ],
-        },
-        {
-          title: "Por estilo",
-          links: [
-            { label: "Con dije", href: "/collares/con-dije" },
-            { label: "Capas múltiples", href: "/collares/capas" },
-            { label: "Iniciales", href: "/collares/iniciales" },
-            { label: "Personalizados", href: "/collares/personalizados" },
-          ],
-        },
-      ],
-      featuredImage: {
-        src: "/placeholder-collares.jpg",
-        alt: "Colección de collares Katalina",
+    imageSrc: "/placeholder-collares.jpg",
+    columns: [
+      {
+        titleKey: "byLength",
+        linkGroup: "necklacesLength",
+        links: [
+          { linkKey: "choker", href: "/collares/choker" },
+          { linkKey: "princess", href: "/collares/princesa" },
+          { linkKey: "matinee", href: "/collares/matinee" },
+          { linkKey: "long", href: "/collares/largos" },
+        ],
       },
-      ctaLabel: "Ver toda la colección de collares",
-      ctaHref: "/collares",
-    },
+      {
+        titleKey: "byStyle",
+        linkGroup: "necklacesStyle",
+        links: [
+          { linkKey: "withPendant", href: "/collares/con-dije" },
+          { linkKey: "layered", href: "/collares/capas" },
+          { linkKey: "initials", href: "/collares/iniciales" },
+          { linkKey: "personalized", href: "/collares/personalizados" },
+        ],
+      },
+    ],
   },
   {
     labelKey: "bracelets",
+    categoryId: "Pulseras",
     href: "/pulseras",
-    content: {
-      eyebrow: "Categoría",
-      title: "Pulseras",
-      description:
-        "Brazaletes, charms y pulseras tejidas. Combinables entre sí para crear un look único.",
-      columns: [
-        {
-          title: "Por tipo",
-          links: [
-            { label: "Charms", href: "/pulseras/charms" },
-            { label: "Brazaletes rígidos", href: "/pulseras/brazaletes" },
-            { label: "Tejidas", href: "/pulseras/tejidas" },
-            { label: "Cadenas", href: "/pulseras/cadenas" },
-          ],
-        },
-        {
-          title: "Por ocasión",
-          links: [
-            { label: "Uso diario", href: "/pulseras/diario" },
-            { label: "Eventos", href: "/pulseras/eventos" },
-            { label: "Personalizables", href: "/pulseras/personalizables" },
-            { label: "Para regalar", href: "/pulseras/regalo" },
-          ],
-        },
-      ],
-      featuredImage: {
-        src: "/placeholder-pulseras.jpg",
-        alt: "Colección de pulseras Katalina",
+    imageSrc: "/placeholder-pulseras.jpg",
+    columns: [
+      {
+        titleKey: "byType",
+        linkGroup: "braceletsType",
+        links: [
+          { linkKey: "charms", href: "/pulseras/charms" },
+          { linkKey: "bangles", href: "/pulseras/brazaletes" },
+          { linkKey: "woven", href: "/pulseras/tejidas" },
+          { linkKey: "chains", href: "/pulseras/cadenas" },
+        ],
       },
-      ctaLabel: "Ver toda la colección de pulseras",
-      ctaHref: "/pulseras",
-    },
+      {
+        titleKey: "byOccasion",
+        linkGroup: "braceletsOccasion",
+        links: [
+          { linkKey: "daily", href: "/pulseras/diario" },
+          { linkKey: "events", href: "/pulseras/eventos" },
+          { linkKey: "personalizable", href: "/pulseras/personalizables" },
+          { linkKey: "gifting", href: "/pulseras/regalo" },
+        ],
+      },
+    ],
   },
   {
     labelKey: "chokers",
+    categoryId: "Gargantillas",
     href: "/gargantillas",
-    content: {
-      eyebrow: "Categoría",
-      title: "Gargantillas",
-      description:
-        "Piezas que abrazan el cuello con elegancia. Diseños desde minimalistas hasta statement.",
-      columns: [
-        {
-          title: "Por material",
-          links: [
-            { label: "Plata 925", href: "/gargantillas/plata" },
-            { label: "Oro rosa", href: "/gargantillas/oro-rosa" },
-            { label: "Terciopelo", href: "/gargantillas/terciopelo" },
-            { label: "Cuero", href: "/gargantillas/cuero" },
-          ],
-        },
-        {
-          title: "Por estilo",
-          links: [
-            { label: "Minimalistas", href: "/gargantillas/minimalistas" },
-            { label: "Con piedras", href: "/gargantillas/con-piedras" },
-            { label: "Tejidas", href: "/gargantillas/tejidas" },
-            { label: "Statement", href: "/gargantillas/statement" },
-          ],
-        },
-      ],
-      featuredImage: {
-        src: "/placeholder-gargantillas.jpg",
-        alt: "Colección de gargantillas Katalina",
+    imageSrc: "/placeholder-gargantillas.jpg",
+    columns: [
+      {
+        titleKey: "byMaterial",
+        linkGroup: "chokersMaterial",
+        links: [
+          { linkKey: "silver925", href: "/gargantillas/plata" },
+          { linkKey: "roseGold", href: "/gargantillas/oro-rosa" },
+          { linkKey: "velvet", href: "/gargantillas/terciopelo" },
+          { linkKey: "leather", href: "/gargantillas/cuero" },
+        ],
       },
-      ctaLabel: "Ver toda la colección de gargantillas",
-      ctaHref: "/gargantillas",
-    },
+      {
+        titleKey: "byStyle",
+        linkGroup: "chokersStyle",
+        links: [
+          { linkKey: "minimalist", href: "/gargantillas/minimalistas" },
+          { linkKey: "withStones", href: "/gargantillas/con-piedras" },
+          { linkKey: "woven", href: "/gargantillas/tejidas" },
+          { linkKey: "statement", href: "/gargantillas/statement" },
+        ],
+      },
+    ],
   },
 ];
 
 export function Header() {
+  /**
+   * 3 namespaces necesarios:
+   *   - tNav: para "nav.{earrings|necklaces|...}" + "nav.shop" + "nav.search" + "nav.home"
+   *   - tHeader: para "header.wishlistLabel" (badge del corazón)
+   *   - tMega: para "header.megaMenu.*" (todo el contenido del mega menú)
+   *   - tCategories: para "product.categories.{Aretes|...}" (title del mega)
+   */
   const tNav = useTranslations("nav");
   const tHeader = useTranslations("header");
+  const tMega = useTranslations("header.megaMenu");
+  const tCategories = useTranslations("product.categories");
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
@@ -223,16 +291,66 @@ export function Header() {
     : "/wishlist";
 
   /**
-   * Array traducido para pasar a MobileNav.
+   * Array completo con TEXTOS YA RESUELTOS al idioma activo.
    *
-   * MobileNav espera { label: string, href, content } — NO conoce
-   * traducciones. Aquí construimos esa estructura traduciendo cada
-   * labelKey con tNav().
+   * Para cada categoría:
+   *   - label: nav.{labelKey}                    (Aretes / Earrings)
+   *   - href, content.featuredImage.src: estables (no se traducen)
+   *   - content.eyebrow: header.megaMenu.eyebrow ("Categoría" / "Category")
+   *   - content.title: product.categories.{categoryId} (Aretes / Earrings)
+   *   - content.description: header.megaMenu.descriptions.{categoryId}
+   *   - content.columns: arr de {title, links}, todos resueltos
+   *   - content.featuredImage.alt: header.megaMenu.imageAlt con interpolación
+   *   - content.ctaLabel: header.megaMenu.ctaLabel con interpolación
+   *
+   * useMemo: evita reconstruir todo el array en cada render del Header
+   * (que ocurre muchas veces por hover/scroll). Solo se reconstruye cuando
+   * cambian las funciones t (típicamente al cambiar el locale).
    */
-  const translatedCategoriesForMobile = navCategories.map((category) => ({
-    label: tNav(category.labelKey),
-    href: category.href,
-    content: category.content,
+  const translatedCategories = useMemo(() => {
+    return navCategoriesData.map((cat) => {
+      // Nombre de la categoría resuelto al locale (ej. "Aretes" / "Earrings").
+      // Lo usamos en title, alt y ctaLabel.
+      const categoryName = tCategories(cat.categoryId);
+
+      // Construir el content completo del mega menú
+      const content: MegaMenuContent = {
+        eyebrow: tMega("eyebrow"),
+        title: categoryName,
+        description: tMega(`descriptions.${cat.categoryId}`),
+        columns: cat.columns.map((col) => ({
+          title: tMega(`columnTitles.${col.titleKey}`),
+          links: col.links.map((link) => ({
+            // tMega("links.earringsStyle.minimalist") → "Minimalistas"/"Minimalist"
+            label: tMega(`links.${col.linkGroup}.${link.linkKey}`),
+            href: link.href,
+          })),
+        })),
+        featuredImage: {
+          src: cat.imageSrc,
+          alt: tMega("imageAlt", { category: categoryName }),
+        },
+        ctaLabel: tMega("ctaLabel", { category: categoryName }),
+        ctaHref: cat.href,
+      };
+
+      return {
+        labelKey: cat.labelKey,
+        label: tNav(cat.labelKey), // Aretes / Earrings (para el link del nav)
+        href: cat.href,
+        content,
+      };
+    });
+  }, [tNav, tMega, tCategories]);
+
+  /**
+   * Array reducido para MobileNav. MobileNav espera { label, href, content }
+   * sin labelKey. Lo derivamos del array completo arriba.
+   */
+  const translatedCategoriesForMobile = translatedCategories.map((cat) => ({
+    label: cat.label,
+    href: cat.href,
+    content: cat.content,
   }));
 
   return (
@@ -255,7 +373,7 @@ export function Header() {
               className="hidden md:flex items-center gap-1"
               aria-label={tNav("shop")}
             >
-              {navCategories.map((category) => (
+              {translatedCategories.map((category) => (
                 <div
                   key={category.labelKey}
                   onMouseEnter={() => setHoveredCategory(category.labelKey)}
@@ -269,7 +387,7 @@ export function Header() {
                       hoveredCategory === category.labelKey && "text-accent"
                     )}
                   >
-                    {tNav(category.labelKey)}
+                    {category.label}
                   </Link>
                 </div>
               ))}
@@ -280,7 +398,7 @@ export function Header() {
           <div className="justify-self-center">
             <Link
               href="/"
-              aria-label={`Katalina — ${tNav("home")}`}
+              aria-label={`MKatalina — ${tNav("home")}`}
               className="inline-block transition-opacity hover:opacity-70"
             >
               <Logo size={isScrolled ? "sm" : "md"} />
@@ -342,7 +460,7 @@ export function Header() {
         </div>
       </Container>
 
-      {/* Mega-menú */}
+      {/* Mega-menú: renderiza el content ya traducido de la categoría hover */}
       {hoveredCategory && (
         <div
           onMouseEnter={() => setHoveredCategory(hoveredCategory)}
@@ -350,7 +468,7 @@ export function Header() {
         >
           <CategoryMegaMenu
             content={
-              navCategories.find((c) => c.labelKey === hoveredCategory)!
+              translatedCategories.find((c) => c.labelKey === hoveredCategory)!
                 .content
             }
           />

@@ -1,49 +1,70 @@
 /**
  * ============================================================================
- * SEO HELPERS — KATALINA
+ * SEO HELPERS — MKATALINA (rebrand: constantes globales actualizadas)
  * ============================================================================
  *
- * Constantes y utilidades compartidas para todo el SEO del sitio.
+ * Cambios respecto a la versión anterior:
+ *   - SITE_URL: "https://katalina.mx" → "https://mkatalina.mx"
+ *   - SITE_NAME: "Katalina" → "MKatalina"
+ *   - SITE_DESCRIPTION: ahora menciona "MKatalina" implícitamente (es la
+ *     descripción del sitio, no menciona el nombre directo pero es info
+ *     del sitio rebrandeado)
+ *   - TWITTER_HANDLE: "@katalina_mx" → "@mkatalina_mx"
  *
- * Centralizar estos valores aquí permite:
- *   - Cambiar la URL de producción en un solo lugar
- *   - Cambiar el nombre de la marca, descripción global, etc. sin
- *     buscar/reemplazar por todo el código
- *   - Garantizar consistencia entre meta tags, sitemap, structured data,
- *     y Open Graph
+ * Lo que NO cambia:
+ *   - SITE_LOCALE y SITE_LANG (sigue siendo es_MX / es-MX)
+ *   - GOOGLE_SITE_VERIFICATION (sigue vacío hasta producción)
+ *   - absoluteUrl() function (sin cambios)
  *
- * En Fase 12 con next-intl, estas constantes se mantendrán pero algunas
- * (como `siteDescription`) tendrán versiones traducidas.
+ * ─── IMPACTO DE ESTOS CAMBIOS ──────────────────────────────────────────
+ *
+ * SITE_URL afecta:
+ *   - sitemap.xml: todas las URLs incluyen este prefijo
+ *   - Open Graph URLs (preview en WhatsApp/Twitter/Facebook)
+ *   - canonical URLs en metadata
+ *   - Structured data @id en JSON-LD
+ *   - absoluteUrl() helper que se usa en TODA la app
+ *
+ * SITE_NAME afecta:
+ *   - <title> de páginas
+ *   - Open Graph title fallback
+ *   - JSON-LD Organization name
+ *   - mensajes que usan {siteName} via messages.json
+ *
+ * TWITTER_HANDLE afecta:
+ *   - Twitter Cards meta tag
+ *
+ * ─── PENDIENTES PARA PRODUCCIÓN ────────────────────────────────────────
+ *
+ * Cuando llegue el momento de lanzar:
+ *   1. Confirmar que mkatalina.mx es el dominio real (comprado y configurado)
+ *   2. Subir og-default.png al /public/ del proyecto (1200x630)
+ *   3. Configurar GOOGLE_SITE_VERIFICATION con el código real de Search Console
+ *   4. Confirmar el handle real de Twitter/X si va a tener cuenta
+ * ─────────────────────────────────────────────────────────────────────
  * ============================================================================
  */
 
 /**
  * URL canónica del sitio en producción.
  *
- * ⚠️ IMPORTANTE: cambia esto cuando tengas el dominio real.
- *
- * Convención: SIN slash al final. Si pones "https://katalina.mx/" causarás
+ * Convención: SIN slash al final. Si pones "https://mkatalina.mx/" causarás
  * URLs con doble slash al concatenar paths como "/aretes".
- *
- * Por qué importante:
- *   - Se usa en sitemap.xml para que Google sepa la URL completa de cada página
- *   - Se usa en Open Graph para que las previews en WhatsApp/Twitter
- *     muestren la URL correcta
- *   - Se usa en structured data para los `@id` de cada entidad
  */
-export const SITE_URL = "https://katalina.mx";
+export const SITE_URL = "https://mkatalina.mx";
 
 /**
  * Nombre de la marca. Se usa en titles, OG, structured data.
  */
-export const SITE_NAME = "Katalina";
+export const SITE_NAME = "MKatalina";
 
 /**
  * Descripción global del sitio. Aparece como meta description por defecto
  * en páginas que no definen una específica.
  *
- * Máximo recomendado: 155-160 caracteres. Google trunca en ese límite.
- * Lo que está aquí tiene 138 chars — espacio para crecer sin romper.
+ * Nota: el copy NO menciona "MKatalina" explícitamente (es opcional) —
+ * describe los productos del sitio. El nombre aparece en el <title>
+ * automáticamente vía templates de Next metadata.
  */
 export const SITE_DESCRIPTION =
   "Joyería artesanal mexicana hecha a mano. Aretes, collares, pulseras y gargantillas en plata 925, oro rosa y piedras naturales.";
@@ -57,56 +78,41 @@ export const SITE_LANG = "es-MX";
 
 /**
  * Imagen Open Graph por defecto.
+ * Apunta a /og-default.png en /public/.
  *
- * 1200×630 es el tamaño estándar para que se vea bien en:
- *   - WhatsApp
- *   - Facebook
- *   - Twitter (Twitter usa una proporción ligeramente distinta pero 1200×630 funciona)
- *   - LinkedIn
- *   - iMessage
- *
- * Por ahora apunta a /og-default.png que debes generar y colocar en
- * /public/og-default.png. En el Turno 2 te explico cómo generar una buena
- * imagen OG sin diseñador.
+ * Importante: cuando regeneres esta imagen (con el branding nuevo de
+ * MKatalina), debes mantener el nombre del archivo o actualizar esta
+ * constante.
  */
 export const OG_DEFAULT_IMAGE = `${SITE_URL}/og-default.png`;
 
 /**
  * Twitter handle (sin @). Aparece como "author" cuando se comparte en Twitter.
- * Cambia por tu handle real cuando lo tengas.
+ *
+ * IMPORTANTE: confirma que este handle esté disponible/registrado antes de
+ * producción. Si está tomado, ajustar a una alternativa (ej. @mkatalinajoyeria).
  */
-export const TWITTER_HANDLE = "@katalina_mx";
+export const TWITTER_HANDLE = "@mkatalina_mx";
 
 /**
  * Verificación de Google Search Console.
- *
- * Cuando lances el sitio:
- *   1. Ve a https://search.google.com/search-console
- *   2. Agrega tu propiedad (la URL del sitio)
- *   3. Elige el método "HTML tag"
- *   4. Google te dará un código como "abc123def456..."
- *   5. Pega ese código aquí (sin las comillas envolventes, solo el contenido)
- *
- * Hasta que lo configures, déjalo vacío. El sitio funciona igual.
+ * Sigue vacío hasta que se configure en producción.
  */
-export const GOOGLE_SITE_VERIFICATION = ""; // ← reemplazar al lanzar
+export const GOOGLE_SITE_VERIFICATION = "";
 
 /**
  * absoluteUrl — construye una URL absoluta a partir de un path relativo.
  *
- * Útil para canonical URLs, Open Graph URLs, structured data, etc.
- * que requieren URLs completas (no relativas como "/aretes").
+ * Sin cambios respecto a la versión anterior. Solo cambia el SITE_URL
+ * base que ahora apunta a mkatalina.mx.
  *
  * Ejemplos:
- *   absoluteUrl("/aretes") → "https://katalina.mx/aretes"
- *   absoluteUrl("/")       → "https://katalina.mx"
- *   absoluteUrl("aretes")  → "https://katalina.mx/aretes" (acepta sin slash)
+ *   absoluteUrl("/aretes") → "https://mkatalina.mx/aretes"
+ *   absoluteUrl("/")       → "https://mkatalina.mx"
+ *   absoluteUrl("aretes")  → "https://mkatalina.mx/aretes"
  */
 export function absoluteUrl(path: string): string {
-  // Asegurar que el path empiece con /
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  // El SITE_URL no tiene slash final, así que concatenamos directo
-  // Para path "/" (raíz), retornamos solo SITE_URL para evitar doble slash
   if (normalizedPath === "/") return SITE_URL;
   return `${SITE_URL}${normalizedPath}`;
 }

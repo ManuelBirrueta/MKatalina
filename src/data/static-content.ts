@@ -1,36 +1,87 @@
 /**
  * ============================================================================
- * STATIC CONTENT — KATALINA (Fase 12 Turno 3A: bilingüe)
+ * STATIC CONTENT — MKATALINA (Fase 12 Turno 3C: legales bilingües + disclaimer)
  * ============================================================================
  *
- * Reestructuración bilingüe: cada campo de texto ahora es { es, en }.
+ * Cambios respecto a la versión anterior (Turno 3A):
+ *   - policiesContent: campo `en` de las 2 secciones traducido al inglés
+ *   - privacyContent: campo `en` de la sección traducido al inglés
+ *   - termsContent: campo `en` de la sección traducido al inglés
+ *   - termsContent.hero.subtitle.en: corregido de "plain English" a
+ *     "plain language" (la traducción literal no tenía sentido lógico)
+ *   - Agregado disclaimer de prevalencia del español al inicio de la
+ *     primera sección de CADA documento legal en la versión `en`:
+ *     "⚠️ This is an English translation provided for convenience.
+ *      The original Spanish version is the legally binding text..."
  *
- * Cambios respecto a la versión anterior:
- *   - Quiénes somos: traducido completamente al inglés
- *   - Contacto: traducido completamente al inglés
- *   - FAQ: traducido completamente al inglés
+ * Lo que NO cambia:
+ *   - aboutContent (Quiénes somos) — ya traducido en Turno 3A
+ *   - contactContent (Contacto) — ya traducido en Turno 3A
+ *   - faqContent (FAQ con 5 categorías) — ya traducido en Turno 3A
+ *   - Toda la estructura de tipos (LegalSection, FaqQuestion, FaqCategory)
+ *   - Los datos no localizados (URLs, emails, teléfonos, IDs)
  *
- *   - Políticas, Privacidad, Términos: PENDIENTES de traducción
- *     (Turno 3C). Por ahora ambos idiomas tienen el texto en español
- *     para que el sitio no se rompa.
+ * ─── ENFOQUE DEL DISCLAIMER ─────────────────────────────────────────────
  *
- * Las traducciones de FAQ y comerciales (about, contact) son borradores
- * razonables hechas por Claude. Para producción se recomienda revisión
- * por un nativo o traductor profesional, especialmente para los matices
- * de marca.
+ * Decisión arquitectural: en lugar de agregar un campo `disclaimer` nuevo
+ * a los objetos legales (que requeriría modificar LegalPageLayout para
+ * renderizarlo), incluimos el disclaimer como el PRIMER PÁRRAFO de la
+ * PRIMERA sección, SOLO en la versión inglesa.
  *
- * Sobre los formatos:
- *   - Strings simples → { es: "...", en: "..." }
- *   - Arrays de strings → { es: [...], en: [...] }
- *   - Objetos anidados → mantienen estructura, los strings internos
- *     son LocalizedString
+ * Esto significa:
+ *   - paragraphs.es: [párrafo1, párrafo2, ...]
+ *   - paragraphs.en: [DISCLAIMER, párrafo1_traducido, párrafo2_traducido, ...]
  *
- * Datos NO localizados (no cambian entre idiomas):
- *   - Iconos
- *   - URLs (mailto, tel, redes sociales)
- *   - Direcciones físicas (la ciudad es la misma)
- *   - IDs y slugs
- * ============================================================================
+ * Ventajas:
+ *   - Cero cambios en LegalPageLayout (su contrato sigue igual)
+ *   - Cero cambios en LegalSection (tipo sigue igual)
+ *   - El disclaimer aparece automáticamente arriba del contenido en /en
+ *   - En /es, las versiones tienen distinto número de párrafos pero esto
+ *     no causa problemas porque LegalPageLayout renderiza paragraphs.length
+ *     dinámicamente
+ *
+ * Desventajas:
+ *   - El disclaimer no tiene estilo visual destacado (no es un banner amarillo)
+ *   - Solo se distingue del contenido normal por el emoji ⚠️ al inicio
+ *
+ * Si en el futuro quisieras un disclaimer visualmente destacado, requeriría:
+ *   - Agregar campo opcional `disclaimer?: LocalizedString` al objeto legal
+ *   - Modificar LegalPageLayout para renderizar disclaimer (si existe) con
+ *     un componente Banner separado arriba de las secciones
+ * Por ahora, lo dejamos inline. Funcional y suficiente.
+ *
+ * ─── ADVERTENCIA CRÍTICA ────────────────────────────────────────────────
+ *
+ * El contenido legal actual es MÍNIMO y NO SUFICIENTE para producción.
+ * Antes de comercializar el sitio, se DEBE expandir cada documento:
+ *
+ *   POLÍTICAS — falta: garantías por defectos de fábrica, envíos
+ *     internacionales con tiempos y costos, productos personalizados
+ *     (no retornables), aretes (no retornables por higiene), proceso
+ *     paso a paso de devoluciones, costos de envío de retorno.
+ *
+ *   PRIVACIDAD — falta TODO menos la intro: qué datos recopilamos
+ *     (registro, pedidos, navegación, cookies), finalidades (operativas
+ *     vs comerciales/marketing), cómo se protegen, con quién se comparten
+ *     (procesadores de pago, paqueterías, hosting), derechos ARCO, cómo
+ *     ejercerlos, transferencias internacionales, cookies y tecnologías
+ *     similares, cambios al aviso.
+ *
+ *   TÉRMINOS — falta TODO menos la aceptación: uso permitido del sitio,
+ *     cuenta de usuario (creación, suspensión, eliminación), propiedad
+ *     intelectual (diseños, marca, contenido), productos y precios
+ *     (errores tipográficos, stock limitado), pagos (procesador, monedas,
+ *     impuestos), envíos (referencia a políticas), devoluciones (referencia
+ *     a políticas), garantía (referencia a políticas), limitación de
+ *     responsabilidad, indemnización, jurisdicción aplicable y leyes,
+ *     resolución de disputas, modificaciones a los términos.
+ *
+ * Adicionalmente, esto requiere REVISIÓN POR ABOGADO especialista en:
+ *   - LFPDPPP México (Ley Federal de Protección de Datos Personales)
+ *   - LFPC México (Ley Federal de Protección al Consumidor) — específicamente
+ *     para garantías, devoluciones y cláusulas abusivas
+ *   - Si vendes a otros países: GDPR (Europa), CCPA (California), LGPD (Brasil)
+ * ─────────────────────────────────────────────────────────────────────
  */
 
 import type { LocalizedString, LocalizedStringArray } from "@/lib/i18n-helpers";
@@ -65,7 +116,20 @@ export interface FaqCategory {
   questions: FaqQuestion[];
 }
 
-/* ─── QUIÉNES SOMOS ───────────────────────────────────────────────────── */
+/**
+ * Disclaimer de prevalencia del español.
+ *
+ * Constante exportada para evitar repetirla en cada documento legal.
+ * Solo aparece en la versión `en` (el español ES el original, no necesita
+ * disclaimer de traducción).
+ *
+ * El emoji ⚠️ al inicio sirve como ancla visual sutil para distinguirlo
+ * del contenido legal regular sin necesidad de styling especial.
+ */
+const ENGLISH_LEGAL_DISCLAIMER =
+  "⚠️ This is an English translation provided for convenience. The original Spanish version is the legally binding text. In case of any discrepancy between this translation and the Spanish original, the Spanish version shall prevail.";
+
+/* ─── QUIÉNES SOMOS (sin cambios respecto al Turno 3A) ────────────────── */
 export const aboutContent = {
   hero: {
     eyebrow: {
@@ -77,8 +141,8 @@ export const aboutContent = {
       en: "Made by hand, with intention",
     },
     subtitle: {
-      es: "Katalina nace en el norte de México con una idea simple: crear joyería que cuente historias, sin perder la conexión con quien la usa.",
-      en: "Katalina was born in northern Mexico with a simple idea: to create jewelry that tells stories, without losing the connection with the person who wears it.",
+      es: "MKatalina nace en el norte de México con una idea simple: crear joyería que cuente historias, sin perder la conexión con quien la usa.",
+      en: "MKatalina was born in northern Mexico with a simple idea: to create jewelry that tells stories, without losing the connection with the person who wears it.",
     },
   },
   story: {
@@ -92,11 +156,11 @@ export const aboutContent = {
     },
     paragraphs: {
       es: [
-        "Katalina empezó en 2024 en un taller modesto en Mazatlán, Sinaloa. Lo que comenzó como un proyecto personal —diseñar piezas únicas para amigas— se convirtió en algo más grande cuando entendimos que cada persona busca joyería que refleje quién es, no lo que está de moda.",
+        "MKatalina empezó en 2024 en un taller modesto en Mazatlán, Sinaloa. Lo que comenzó como un proyecto personal —diseñar piezas únicas para amigas— se convirtió en algo más grande cuando entendimos que cada persona busca joyería que refleje quién es, no lo que está de moda.",
         "Trabajamos con artesanos locales que conocen su oficio desde generaciones atrás. Cada pieza pasa por sus manos antes de llegar a las tuyas. No producimos en masa, no buscamos volumen. Buscamos que cada arete, cada collar, cada pulsera tenga algo que valga la pena conservar.",
       ],
       en: [
-        "Katalina started in 2024 in a modest workshop in Mazatlán, Sinaloa. What began as a personal project —designing unique pieces for friends— became something bigger when we understood that everyone seeks jewelry that reflects who they are, not what's trending.",
+        "MKatalina started in 2024 in a modest workshop in Mazatlán, Sinaloa. What began as a personal project —designing unique pieces for friends— became something bigger when we understood that everyone seeks jewelry that reflects who they are, not what's trending.",
         "We work with local artisans whose craft has been passed down through generations. Every piece goes through their hands before reaching yours. We don't mass produce, we don't chase volume. We aim for every earring, necklace, and bracelet to be worth keeping.",
       ],
     },
@@ -107,8 +171,8 @@ export const aboutContent = {
       en: "What guides us",
     },
     title: {
-      es: "Tres ideas que sostienen Katalina",
-      en: "Three ideas that sustain Katalina",
+      es: "Tres ideas que sostienen MKatalina",
+      en: "Three ideas that sustain MKatalina",
     },
     items: [
       {
@@ -163,8 +227,8 @@ export const aboutContent = {
           en: "Founder and designer",
         },
         bio: {
-          es: "Diseñadora industrial por formación, joyera por vocación. Después de años trabajando en agencias de branding, María decidió que quería crear algo que durara más que una campaña publicitaria. Katalina es ese algo.",
-          en: "Industrial designer by training, jeweler by vocation. After years working at branding agencies, María decided she wanted to create something that would last longer than an advertising campaign. Katalina is that something.",
+          es: "Diseñadora industrial por formación, joyera por vocación. Después de años trabajando en agencias de branding, María decidió que quería crear algo que durara más que una campaña publicitaria. MKatalina es ese algo.",
+          en: "Industrial designer by training, jeweler by vocation. After years working at branding agencies, María decided she wanted to create something that would last longer than an advertising campaign. MKatalina is that something.",
         },
       },
     ],
@@ -186,7 +250,7 @@ export const aboutContent = {
   },
 };
 
-/* ─── CONTACTO ────────────────────────────────────────────────────────── */
+/* ─── CONTACTO (sin cambios respecto al Turno 3A) ─────────────────────── */
 export const contactContent = {
   hero: {
     eyebrow: {
@@ -203,8 +267,7 @@ export const contactContent = {
     },
   },
   details: {
-    /* Datos NO localizados: el email, teléfono y dirección son los mismos */
-    email: "hola@katalina.mx",
+    email: "hola@mkatalina.mx",
     phone: "+52 (669) 123 4567",
     phoneDisplay: "+52 669 123 4567",
     address: {
@@ -212,7 +275,6 @@ export const contactContent = {
       neighborhood: "Centro Histórico",
       city: "Mazatlán, Sinaloa",
       postalCode: "82000",
-      /* country puede traducirse porque "México"/"Mexico" cambian */
       country: {
         es: "México",
         en: "Mexico",
@@ -224,12 +286,12 @@ export const contactContent = {
     },
     social: {
       instagram: {
-        handle: "@katalina.mx",
-        url: "https://instagram.com/katalina.mx",
+        handle: "@mkatalina.mx",
+        url: "https://instagram.com/mkatalina.mx",
       },
       facebook: {
-        handle: "Katalina Joyería",
-        url: "https://facebook.com/katalina.mx",
+        handle: "MKatalina Joyería",
+        url: "https://facebook.com/mkatalina.mx",
       },
     },
   },
@@ -246,7 +308,6 @@ export const contactContent = {
       es: "Te respondemos en menos de 24 horas hábiles. Si es urgente, llámanos.",
       en: "We reply within 24 business hours. If it's urgent, give us a call.",
     },
-    /* Labels y placeholders del formulario */
     labels: {
       name: { es: "Tu nombre", en: "Your name" },
       email: { es: "Email", en: "Email" },
@@ -299,7 +360,6 @@ export const contactContent = {
         label: { es: "Otro tema", en: "Another topic" },
       },
     ],
-    /* Mensajes de validación inline */
     errors: {
       nameRequired: {
         es: "Tu nombre es obligatorio",
@@ -380,7 +440,11 @@ export const contactContent = {
   },
 };
 
-/* ─── POLÍTICAS (pendiente de traducción al inglés en Turno 3C) ───────── */
+/* ─── POLÍTICAS (Turno 3C: traducido + disclaimer en /en) ─────────────── */
+/**
+ * Contenido placeholder. Necesita EXPANSIÓN antes de producción
+ * (ver advertencia crítica al inicio de este archivo).
+ */
 export const policiesContent = {
   hero: {
     eyebrow: {
@@ -400,10 +464,6 @@ export const policiesContent = {
     es: "1 de mayo de 2026",
     en: "May 1, 2026",
   },
-  /**
-   * Las secciones detalladas usan el mismo texto en ambos idiomas por ahora.
-   * Se traducen en Turno 3C después de revisión legal.
-   */
   sections: [
     {
       id: "envios",
@@ -417,10 +477,16 @@ export const policiesContent = {
           "El tiempo de entrega varía según el método de envío elegido: el envío estándar tarda entre 3 y 5 días hábiles.",
           "Por ahora no realizamos envíos internacionales. Estamos trabajando en habilitar esta opción próximamente.",
         ],
+        /**
+         * Primera sección de /en: el disclaimer va como primer párrafo,
+         * seguido de los párrafos traducidos. Esta es la única sección con
+         * disclaimer en este documento — las siguientes solo tienen contenido.
+         */
         en: [
-          "Enviamos a toda la República Mexicana. Los pedidos se procesan en un plazo de 1 a 2 días hábiles después de confirmado el pago.",
-          "El tiempo de entrega varía según el método de envío elegido: el envío estándar tarda entre 3 y 5 días hábiles.",
-          "Por ahora no realizamos envíos internacionales. Estamos trabajando en habilitar esta opción próximamente.",
+          ENGLISH_LEGAL_DISCLAIMER,
+          "We ship throughout Mexico. Orders are processed within 1 to 2 business days after payment confirmation.",
+          "Delivery time varies depending on the shipping method chosen: standard shipping takes between 3 and 5 business days.",
+          "We do not currently offer international shipping. We are working on enabling this option soon.",
         ],
       },
     },
@@ -433,18 +499,23 @@ export const policiesContent = {
       paragraphs: {
         es: [
           "Aceptamos devoluciones dentro de los 30 días posteriores a la fecha de entrega.",
-          "Para iniciar una devolución, escríbenos a hola@katalina.mx indicando tu número de pedido.",
+          "Para iniciar una devolución, escríbenos a hola@mkatalina.mx indicando tu número de pedido.",
         ],
         en: [
-          "Aceptamos devoluciones dentro de los 30 días posteriores a la fecha de entrega.",
-          "Para iniciar una devolución, escríbenos a hola@katalina.mx indicando tu número de pedido.",
+          "We accept returns within 30 days following the delivery date.",
+          "To start a return, write to us at hola@mkatalina.mx indicating your order number.",
         ],
       },
     },
   ] satisfies LegalSection[],
 };
 
-/* ─── PRIVACIDAD (pendiente de traducción al inglés en Turno 3C) ──────── */
+/* ─── PRIVACIDAD (Turno 3C: traducido + disclaimer en /en) ────────────── */
+/**
+ * Contenido placeholder. Necesita EXPANSIÓN COMPLETA antes de producción.
+ * Faltan: datos recopilados, finalidades, derechos ARCO, cookies, etc.
+ * (ver advertencia crítica al inicio de este archivo).
+ */
 export const privacyContent = {
   hero: {
     eyebrow: {
@@ -473,17 +544,30 @@ export const privacyContent = {
       },
       paragraphs: {
         es: [
-          "Katalina es responsable del tratamiento de tus datos personales. Operamos en México y cumplimos con la LFPDPPP.",
+          "MKatalina es responsable del tratamiento de tus datos personales. Operamos en México y cumplimos con la LFPDPPP.",
         ],
+        /**
+         * Primera (y única) sección de /en: disclaimer + párrafo traducido.
+         * Nota: "LFPDPPP" se mantiene en español porque es el nombre oficial
+         * de la ley mexicana — no se traduce. Se podría expandir a
+         * "Mexican Federal Law on Protection of Personal Data Held by Private
+         * Parties (LFPDPPP)" cuando el contenido se expanda en producción.
+         */
         en: [
-          "Katalina es responsable del tratamiento de tus datos personales. Operamos en México y cumplimos con la LFPDPPP.",
+          ENGLISH_LEGAL_DISCLAIMER,
+          "MKatalina is responsible for the processing of your personal data. We operate in Mexico and comply with the LFPDPPP (Mexican Federal Law on Protection of Personal Data Held by Private Parties).",
         ],
       },
     },
   ] satisfies LegalSection[],
 };
 
-/* ─── TÉRMINOS (pendiente de traducción al inglés en Turno 3C) ────────── */
+/* ─── TÉRMINOS (Turno 3C: traducido + disclaimer en /en) ──────────────── */
+/**
+ * Contenido placeholder. Necesita EXPANSIÓN COMPLETA antes de producción.
+ * Faltan: uso del sitio, cuenta de usuario, propiedad intelectual, etc.
+ * (ver advertencia crítica al inicio de este archivo).
+ */
 export const termsContent = {
   hero: {
     eyebrow: {
@@ -495,8 +579,14 @@ export const termsContent = {
       en: "The rules of the game",
     },
     subtitle: {
-      es: "Al usar Katalina aceptas estos términos. Los escribimos en español claro, no en jerga legal.",
-      en: "By using Katalina you accept these terms. We wrote them in plain English, not in legal jargon.",
+      es: "Al usar MKatalina aceptas estos términos. Los escribimos en español claro, no en jerga legal.",
+      /**
+       * Corregido de "plain English" a "plain language" — la traducción
+       * literal "We wrote them in plain English" no tenía sentido lógico
+       * (los términos están en lenguaje claro, no específicamente en inglés).
+       * "Plain language" preserva la intención del original.
+       */
+      en: "By using MKatalina you accept these terms. We wrote them in plain language, not in legal jargon.",
     },
   },
   lastUpdated: {
@@ -512,17 +602,18 @@ export const termsContent = {
       },
       paragraphs: {
         es: [
-          "Al acceder al sitio web de Katalina y realizar cualquier interacción, aceptas estos términos y condiciones en su totalidad.",
+          "Al acceder al sitio web de MKatalina y realizar cualquier interacción, aceptas estos términos y condiciones en su totalidad.",
         ],
         en: [
-          "Al acceder al sitio web de Katalina y realizar cualquier interacción, aceptas estos términos y condiciones en su totalidad.",
+          ENGLISH_LEGAL_DISCLAIMER,
+          "By accessing MKatalina's website and engaging in any interaction, you accept these terms and conditions in their entirety.",
         ],
       },
     },
   ] satisfies LegalSection[],
 };
 
-/* ─── FAQ (traducido completamente) ───────────────────────────────────── */
+/* ─── FAQ (sin cambios respecto al Turno 3A) ──────────────────────────── */
 export const faqContent = {
   hero: {
     eyebrow: {

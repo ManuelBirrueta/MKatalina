@@ -1,50 +1,60 @@
 /**
  * ============================================================================
- * PAGE: /[locale]/checkout — KATALINA (Fase 12 Turno 3B.3: fix de raíz)
+ * PAGE: /[locale]/checkout — MKATALINA (Fase 12 fix: validateField + rebrand)
  * ============================================================================
  *
- * Cambios respecto a la versión anterior:
+ * BUG anterior:
+ *   En el archivo del rebrand-2 yo copié una versión VIEJA del archivo donde
+ *   `validateField()` se llamaba con 2 argumentos. Pero el contrato real
+ *   de validateField (de CheckoutForm.tsx, Turno 3B.3) requiere 3 argumentos:
+ *   validateField(field, value, t). El compiler de TypeScript falló con:
+ *     "Expected 3 arguments, but got 2."
  *
- *   FIX DE RAÍZ — Snapshot inmutable con nombres resueltos:
- *     Cuando el usuario "paga", construimos el orderSnapshot que se
- *     guardará en sessionStorage. Antes, `name: item.product.name`
- *     guardaba el LocalizedString completo (objeto {es, en}).
+ * Este archivo restaura la versión CORRECTA del Turno 3B.3 (con
+ * validateField recibiendo `t`) Y mantiene el cambio del rebrand:
+ *   - Prefijo de orderId: KTL- → MKTL-
  *
- *     Ahora resolvemos el nombre al locale ACTIVO al momento de la
- *     compra usando getLocalized(). El snapshot guarda strings, no
- *     objetos. Esto:
- *       - Elimina el error "Objects are not valid as a React child"
- *       - Convierte el snapshot en una "factura inmutable": el idioma
- *         de la confirmación queda congelado al momento de la compra
- *         (como una factura impresa real)
+ * Cambios respecto a la versión anterior (Turno 3B.3):
  *
- *   TRADUCCIONES:
- *     - import Link cambia a "@/i18n/navigation"
- *     - useRouter cambia a "@/i18n/navigation" (mantiene prefijo de locale)
- *     - Breadcrumb "Carrito / Checkout" traducido
- *     - "Finalizar compra" traducido
- *     - Toast de error traducido
+ *   1) validateField recibe `t` como 3er parámetro (sin cambios desde 3B.3).
+ *      Tres llamadas en este archivo lo necesitan:
+ *        - handleFieldBlur (1 llamada)
+ *        - validateAll (1 llamada dentro del forEach)
+ *        - handlePay (1 llamada en el find del primer error)
+ *      A todas les pasamos el `t` del namespace "checkoutForm" obtenido
+ *      del hook useTranslations.
  *
- * ─── DETALLE TÉCNICO SOBRE shippingMethod ──────────────────────────────
- *   SHIPPING_METHODS viene de @/types/checkout. Asumimos que sus campos
- *   label y description son strings (no LocalizedString) — son textos
- *   que se definen estáticamente en el array.
+ *   2) SHIPPING_METHODS.find(...) reemplazado por
+ *      getShippingMethodResolved(shippingMethodId, tShipping)
+ *      que devuelve el método con label/description ya traducidos.
  *
- *   Si más adelante quieres traducir los métodos de envío, habría dos
- *   formas:
- *     A) Hacer ShippingMethod.label/description LocalizedString y resolver
- *        aquí al construir el snapshot
- *     B) Mover los métodos a messages.json bajo namespace checkout.methods
- *        y construir el array dinámicamente con useTranslations()
+ *   3) Snapshot inmutable: item.name resuelto al locale activo del momento
+ *      de la compra usando getLocalized(). El snapshot guarda strings, no
+ *      objetos LocalizedString.
  *
- *   Por ahora se mantienen en español. El defensive parsing en la página
- *   de confirmación tolera ambas formas si en el futuro cambias.
+ *   4) REBRAND: prefijo de orderId KTL- → MKTL-
+ *      "MKTL-K38QZ7BA9X3F" en lugar de "KTL-K38QZ7BA9X3F".
+ *      Visible al usuario en la página de confirmación y en sus pedidos.
  *
- * ─── COMPATIBILIDAD CON SNAPSHOTS VIEJOS ───────────────────────────────
- *   El defensive parsing en la página de confirmación seguirá funcionando
- *   para snapshots que se hayan guardado ANTES de este fix (con objetos
- *   en name). Los snapshots NUEVOS se guardarán correctamente con strings.
- * ============================================================================
+ * Lo que NO cambia:
+ *   - La key de sessionStorage "katalina-last-order" (decisión técnica:
+ *     no la cambiamos para no romper estados guardados)
+ *   - El flujo del handlePay (validar → loading → snapshot → clear → redirect)
+ *   - La estructura del layout (form izquierda, summary derecha)
+ *   - La compatibilidad con snapshots viejos via defensive parsing en
+ *     la página de confirmación
+ *
+ * ─── POR QUÉ PASÓ ESTO ─────────────────────────────────────────────────
+ *
+ * En el rebrand-2 mi proceso fue: copiar el archivo más reciente de mi
+ * sandbox y aplicar sed para cambiar KTL- → MKTL-. El error fue elegir
+ * la versión equivocada de mi sandbox (una vieja con la firma anterior
+ * de validateField).
+ *
+ * Lección: cuando aplico un cambio quirúrgico (solo una línea), debo
+ * partir del archivo MÁS RECIENTE que el usuario tenga aplicado, no
+ * de versiones intermedias en mi sandbox.
+ * ─────────────────────────────────────────────────────────────────────
  */
 
 "use client";
@@ -59,7 +69,7 @@ import { CheckoutSummary } from "@/components/shop/CheckoutSummary";
 import { useCart } from "@/hooks/use-cart";
 import {
   EMPTY_FORM_DATA,
-  SHIPPING_METHODS,
+  getShippingMethodResolved,
   type CheckoutFormData,
   type FormErrors,
   type ShippingMethodId,
@@ -76,11 +86,17 @@ export default function CheckoutPage() {
    * Hooks de i18n:
    *   - locale: idioma activo, para resolver nombres de productos al
    *     construir el snapshot. Esto "congela" el idioma de la factura.
-   *   - t: traducciones del namespace checkout.page para el UI de esta
-   *     página específica.
+   *   - t: traducciones del namespace checkout.page (UI de esta página)
+   *   - tForm: traducciones del namespace checkoutForm (mensajes de error
+   *     de validación). Lo pasamos a validateField cada vez que lo llamamos.
+   *   - tShipping: traducciones de checkout.shippingMethods (labels y
+   *     descriptions del método de envío). Lo pasamos a
+   *     getShippingMethodResolved.
    */
   const locale = useLocale() as Locale;
   const t = useTranslations("checkout.page");
+  const tForm = useTranslations("checkoutForm");
+  const tShipping = useTranslations("checkout.shippingMethods");
 
   /**
    * Estado del formulario. Empieza con todos los campos vacíos.
@@ -110,18 +126,22 @@ export default function CheckoutPage() {
   }, [mounted, isEmpty, isProcessing, router]);
 
   /**
-   * Método de envío seleccionado (objeto completo, derivado del id).
+   * Método de envío seleccionado, RESUELTO al locale activo.
+   *
+   * getShippingMethodResolved construye el objeto con label y
+   * description traducidos al locale activo.
    */
-  const shippingMethod = SHIPPING_METHODS.find(
-    (m) => m.id === shippingMethodId
-  )!;
+  const shippingMethod = getShippingMethodResolved(
+    shippingMethodId,
+    tShipping
+  );
 
   /** Total = subtotal del carrito + costo del envío */
   const total = subtotal + shippingMethod.price;
 
   /**
-   * handleFieldChange — actualiza el valor de un campo + limpia error
-   * automáticamente cuando el usuario empieza a corregir.
+   * handleFieldChange — actualiza valor + limpia error automáticamente.
+   * No necesita cambios para el i18n.
    */
   const handleFieldChange = (
     field: keyof CheckoutFormData,
@@ -140,9 +160,12 @@ export default function CheckoutPage() {
 
   /**
    * handleFieldBlur — valida un campo cuando el usuario sale de él.
+   *
+   * Pasa tForm como 3er parámetro de validateField. Los mensajes
+   * de error que se guardan en `errors` ya vienen traducidos.
    */
   const handleFieldBlur = (field: keyof CheckoutFormData) => {
-    const error = validateField(field, formData[field]);
+    const error = validateField(field, formData[field], tForm);
     if (error) {
       setErrors((prev) => ({ ...prev, [field]: error }));
     }
@@ -150,13 +173,14 @@ export default function CheckoutPage() {
 
   /**
    * validateAll — valida TODOS los campos antes de submit.
+   * Pasa tForm a validateField dentro del forEach.
    */
   const validateAll = (): boolean => {
     const newErrors: FormErrors = {};
 
     (Object.keys(formData) as Array<keyof CheckoutFormData>).forEach(
       (field) => {
-        const error = validateField(field, formData[field]);
+        const error = validateField(field, formData[field], tForm);
         if (error) {
           newErrors[field] = error;
         }
@@ -170,32 +194,23 @@ export default function CheckoutPage() {
   /**
    * handlePay — simula el flujo de pago con PayPal.
    *
-   * ─── CAMBIO IMPORTANTE EN PASO 6 ───────────────────────────────────
-   *   Antes:
-   *     items: items.map((item) => ({
-   *       name: item.product.name,      ← objeto {es, en} → bug
-   *       ...
-   *     }))
+   * El snapshot guarda los nombres de productos y los labels del shipping
+   * method YA RESUELTOS al locale activo del momento de la compra.
+   * Esto convierte el snapshot en una factura inmutable.
    *
-   *   Ahora:
-   *     items: items.map((item) => ({
-   *       name: getLocalized(item.product.name, locale),  ← string resuelto
-   *       ...
-   *     }))
-   *
-   *   Esto guarda el nombre traducido al idioma activo en el momento
-   *   de la compra. La confirmación lee strings, no objetos.
+   * La búsqueda del primer campo con error también pasa tForm
+   * a validateField.
    */
   const handlePay = async () => {
     // Paso 1-2: validar
     const isValid = validateAll();
 
     if (!isValid) {
-      // Scroll al primer campo con error
+      // Scroll al primer campo con error.
       const firstErrorField =
         Object.keys(errors)[0] ||
         (Object.keys(formData) as Array<keyof CheckoutFormData>).find(
-          (f) => validateField(f, formData[f]) !== undefined
+          (f) => validateField(f, formData[f], tForm) !== undefined
         );
 
       if (firstErrorField) {
@@ -218,8 +233,13 @@ export default function CheckoutPage() {
     // Paso 4: simular latencia
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    // Paso 5: generar número de orden client-side
-    const orderId = `KTL-${Date.now().toString(36).toUpperCase()}${Math.random()
+    /**
+     * Paso 5: generar número de orden client-side.
+     *
+     * REBRAND: prefijo cambiado de "KTL-" a "MKTL-".
+     * El order ID resultante: "MKTL-K38QZ7BA9X3F" (timestamp + random).
+     */
+    const orderId = `MKTL-${Date.now().toString(36).toUpperCase()}${Math.random()
       .toString(36)
       .substring(2, 6)
       .toUpperCase()}`;
@@ -227,17 +247,18 @@ export default function CheckoutPage() {
     /**
      * Paso 6: snapshot del pedido para mostrar en /confirmacion.
      *
-     * Resolvemos cada item.product.name con getLocalized() AHORA. Esto
-     * "congela" el idioma de la factura al momento de la compra.
+     * Factura inmutable:
+     *   - item.name: resuelto con getLocalized() al locale activo
+     *   - shippingMethod: ya viene con label y description resueltos
+     *     (los obtuvimos arriba con getShippingMethodResolved)
      *
-     * Decisión arquitectural (Opción 2): la confirmación es como una
-     * factura impresa — no cambia retroactivamente si el usuario cambia
-     * idioma después. Es el comportamiento estándar de plataformas
-     * como Amazon, Mejuri, etc.
+     * Si el usuario cambia idioma DESPUÉS de pagar, la confirmación
+     * mostrará los textos del idioma original (snapshot inmutable).
      */
     const orderSnapshot = {
       orderId,
       formData,
+      // shippingMethod ya tiene label/description como strings resueltos
       shippingMethod,
       items: items.map((item) => ({
         slug: item.slug,
@@ -253,14 +274,20 @@ export default function CheckoutPage() {
       total,
       createdAt: new Date().toISOString(),
       /**
-       * Agregamos el locale al snapshot para referencia.
-       * Esto permite que en el futuro podamos detectar en qué idioma
-       * se hizo la compra (útil para emails de seguimiento, soporte, etc.)
+       * Locale al momento de la compra. Útil para:
+       *   - Detectar en qué idioma se hizo el pedido (emails de seguimiento)
+       *   - Auditar / soporte al cliente
        */
       locale,
     };
 
     try {
+      /**
+       * Storage key intencionalmente NO se cambió en el rebrand:
+       * "katalina-last-order" es una llave técnica de sessionStorage,
+       * no visible al usuario. Cambiarla rompería sesiones de checkout
+       * en progreso (usuarios actuales perderían sus órdenes recién creadas).
+       */
       sessionStorage.setItem(
         "katalina-last-order",
         JSON.stringify(orderSnapshot)
@@ -310,9 +337,7 @@ export default function CheckoutPage() {
             </h1>
           </header>
 
-          {/*
-           * Layout dos columnas: form a la izq, summary a la der.
-           */}
+          {/* Layout dos columnas: form a la izq, summary a la der. */}
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8 lg:gap-12 items-start">
             <div>
               <CheckoutForm

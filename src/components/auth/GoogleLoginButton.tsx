@@ -1,55 +1,48 @@
 /**
  * ============================================================================
- * GOOGLE LOGIN BUTTON — KATALINA (simulado)
+ * GOOGLE LOGIN BUTTON — KATALINA (Fase 12 Turno 3B.4: toast bilingüe)
  * ============================================================================
  *
- * Botón "Continuar con Google" con styling oficial de Google.
+ * Cambios respecto a la versión anterior:
+ *   - Pasa de Server a Client Component implícito a Client Component
+ *     explícito (ya tenía "use client" porque maneja onClick + toast).
+ *   - El toast del handleClick ahora usa useTranslations para mostrar el
+ *     mensaje "Login con Google pendiente" en el idioma activo.
  *
- * Por ahora SIMULADO: al hacer clic muestra un toast explicando que el
- * login social está pendiente de integración con el backend (Fase 12).
+ * Lo que NO cambia:
+ *   - El componente sigue recibiendo `label` como prop. Las páginas
+ *     (login/page.tsx, registro/page.tsx) le pasan el texto ya traducido:
+ *     "Continuar con Google" / "Continue with Google" / etc.
+ *   - El default del `label` se queda en español como fallback de seguridad.
+ *     En el flujo real las páginas SIEMPRE le pasan label traducido, pero
+ *     si por error alguien usa <GoogleLoginButton /> sin label, prefiero
+ *     que muestre algo legible en lugar de undefined.
+ *   - El SVG con los 4 colores oficiales de Google
+ *   - El styling oficial de Google (fondo blanco, borde gris, hover sutil)
  *
- * Cuando llegue NextAuth en Fase 12:
- *   - Reemplazamos el handler onClick por `signIn("google", { ... })`
- *   - El usuario es redirigido a Google para autenticarse
- *   - Google redirige de vuelta con un token
- *   - NextAuth crea la sesión automáticamente
+ * ─── POR QUÉ EL LABEL VIENE POR PROP (NO POR useTranslations interno) ──
  *
- * El componente visualmente NO CAMBIA. Solo cambia la implementación interna.
+ * Las dos páginas que lo usan tienen labels DIFERENTES:
+ *   - /login → "Continuar con Google" / "Continue with Google"
+ *   - /registro → "Registrarse con Google" / "Sign up with Google"
  *
- * Styling:
- *   Google publica guidelines oficiales para botones de "Sign in with Google".
- *   Las seguimos para coherencia visual y para que el usuario reconozca
- *   el botón intuitivamente:
- *     - Fondo blanco
- *     - Borde gris claro
- *     - Logo G de Google de 4 colores
- *     - Texto "Continuar con Google" en negro
+ * Si el componente resolviera el label internamente, tendríamos que pasar
+ * un "variant" en lugar del label. Más complicado por menor beneficio.
  *
- *   Esto es estándar en sitios que usan Google Sign-In.
- *
- * Accesibilidad:
- *   - aria-label explícito porque el botón tiene icono + texto, y queremos
- *     que screen readers entiendan ambos
- *   - Estados focus/disabled estilizados explícitamente
- * ============================================================================
+ * El toast SÍ vive aquí porque es el mismo en ambas páginas (siempre dice
+ * "Login con Google pendiente" / "Google login pending"). Centralizarlo
+ * en el componente evita duplicar las strings en cada página.
+ * ─────────────────────────────────────────────────────────────────────
  */
 
 "use client";
 
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 /**
- * Logo G de Google como SVG inline.
- *
- * Lo dibujamos directamente para no depender de assets externos.
- * Los 4 colores son los oficiales de Google:
- *   - Azul:    #4285F4
- *   - Verde:   #34A853
- *   - Amarillo: #FBBC05
- *   - Rojo:    #EA4335
- *
- * Las paths fueron extraídas del SVG oficial de Google.
+ * Logo G de Google como SVG inline. Sin cambios.
  */
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -80,7 +73,12 @@ function GoogleIcon({ className }: { className?: string }) {
 }
 
 interface GoogleLoginButtonProps {
-  /** Texto del botón. Default: "Continuar con Google" */
+  /**
+   * Texto del botón. Debe venir ya traducido al locale activo.
+   *
+   * Default en español por si alguien usa el componente sin pasar label
+   * (fallback defensivo, no debería pasar en el flujo normal).
+   */
   label?: string;
   /** Si está disabled (ej. durante un submit en proceso) */
   disabled?: boolean;
@@ -94,16 +92,22 @@ export function GoogleLoginButton({
   className,
 }: GoogleLoginButtonProps) {
   /**
-   * handleClick — por ahora muestra toast informativo.
+   * Traducciones para el toast.
+   * Reutilizamos namespace auth.login porque las claves "googlePendingToastTitle"
+   * y "googlePendingToastDescription" están ahí.
+   */
+  const t = useTranslations("auth.login");
+
+  /**
+   * handleClick — por ahora muestra toast informativo en el idioma activo.
    *
    * En Fase 12 esto se reemplazará por:
    *   import { signIn } from "next-auth/react";
    *   const handleClick = () => signIn("google");
    */
   const handleClick = () => {
-    toast.info("Login con Google pendiente", {
-      description:
-        "Esta función estará disponible cuando integremos NextAuth en una fase posterior.",
+    toast.info(t("googlePendingToastTitle"), {
+      description: t("googlePendingToastDescription"),
     });
   };
 
@@ -114,19 +118,14 @@ export function GoogleLoginButton({
       disabled={disabled}
       aria-label={label}
       className={cn(
-        // Layout
         "w-full h-11 px-4",
         "flex items-center justify-center gap-3",
-        // Apariencia oficial de Google
         "bg-white border border-[#dadce0]",
         "rounded-md",
-        // Texto en negro oscuro
         "text-sm font-medium text-[#3c4043]",
-        // Interacciones
         "hover:bg-[#f8f9fa] hover:shadow-sm",
         "transition-all duration-150",
         "cursor-pointer",
-        // Disabled state
         "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:shadow-none",
         className
       )}

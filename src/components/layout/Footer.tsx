@@ -1,29 +1,41 @@
 /**
  * ============================================================================
- * FOOTER — KATALINA (Fase 12: i18n completo)
+ * FOOTER — MKATALINA (rebrand: URLs sociales actualizadas)
  * ============================================================================
  *
  * Cambios respecto a la versión anterior:
- *   - Imports de Link cambian a "@/i18n/navigation"
- *   - Server Component async usando getTranslations()
- *   - Footer column titles y link labels desde traducciones
- *   - Copyright dinámico con interpolación de variables
- *   - Newsletter title/description desde traducciones
+ *   - URLs hardcoded de redes sociales:
+ *     * https://instagram.com/katalina.mx → https://instagram.com/mkatalina.mx
+ *     * https://facebook.com/katalina.mx → https://facebook.com/mkatalina.mx
  *
- * Estructura de los links:
- *   Cada link tiene `labelKey` (clave de traducción) y `href` (path
- *   canónico). En render, t(labelKey) resuelve al texto en el locale
- *   activo. El componente Link añade el prefijo de idioma.
+ * Lo que NO cambia:
+ *   - Estructura del footer (newsletter, columnas, línea legal)
+ *   - El newsletter (con NewsletterForm)
+ *   - footerColumns array (links a categorías y páginas)
+ *   - Los SVG inline de Instagram y Facebook
+ *   - Métodos de pago
+ *   - El copyright con interpolación (lee siteName desde messages.json,
+ *     que ya está rebrandeada a "MKatalina" desde el Turno 1)
  *
- * Nota sobre links rotos:
- *   Tu Footer original linkeaba a /envios, /devoluciones, /reservaciones
- *   que no existen en el proyecto. Limpiamos esos links — ahora apuntamos
- *   a /faq, /contacto y /politicas que sí existen.
+ * ─── COMENTARIO IMPORTANTE ─────────────────────────────────────────────
  *
- * Server Component:
- *   Mantenemos Footer como async Server Component. getTranslations() es
- *   la versión async de useTranslations que funciona server-side.
- *   Resultado: HTML estático sin JS extra al cliente.
+ * El copyright NO tiene "Katalina" hardcoded aquí. El texto se construye
+ * con interpolación:
+ *
+ *   tFooter("copyright", {
+ *     year: currentYear,
+ *     siteName: t("common.siteName"),  ← viene de messages.json
+ *   })
+ *
+ * Como messages.json ya tiene siteName: "MKatalina" desde el Turno 1, el
+ * copyright muestra automáticamente "© 2026 MKatalina. Todos los derechos
+ * reservados.".
+ *
+ * Misma cosa para el tagline ("MKatalina nace en..." → ya viene de messages
+ * desde el Turno 1).
+ *
+ * Por lo tanto, en este archivo SOLO necesitamos cambiar los 2 socialLinks.
+ * ─────────────────────────────────────────────────────────────────────────
  * ============================================================================
  */
 
@@ -96,30 +108,27 @@ function FacebookIcon({ className }: { className?: string }) {
   );
 }
 
+/**
+ * URLs sociales actualizadas al rebrand.
+ *
+ * Si los handles cambian en producción (ej. Instagram no permite
+ * @mkatalina.mx por longitud), las URLs aquí deben actualizarse.
+ */
 const socialLinks = [
   {
     name: "Instagram",
-    href: "https://instagram.com/katalina.mx",
+    href: "https://instagram.com/mkatalina.mx",
     Icon: InstagramIcon,
   },
   {
     name: "Facebook",
-    href: "https://facebook.com/katalina.mx",
+    href: "https://facebook.com/mkatalina.mx",
     Icon: FacebookIcon,
   },
 ];
 
 const paymentMethods = ["Visa", "Mastercard", "PayPal", "Mercado Pago"];
 
-/**
- * Footer como async Server Component.
- *
- * El async es necesario porque getTranslations() es async (a diferencia
- * de useTranslations que es síncrono pero requiere "use client").
- *
- * Esto NOS PERMITE mantener Footer como Server Component → rinde HTML
- * estático sin enviar JS extra al cliente.
- */
 export async function Footer() {
   const t = await getTranslations();
   const tFooter = await getTranslations("footer");
@@ -193,8 +202,8 @@ export async function Footer() {
         >
           {/*
            * Copyright con interpolación.
-           * En el JSON la clave footer.copyright es:
-           *   "© {year} {siteName}. Todos los derechos reservados."
+           * siteName viene de messages.json (ya rebrandeada a "MKatalina"
+           * desde el Turno 1 del rebrand).
            */}
           <p className="text-center md:text-left">
             {tFooter("copyright", {
@@ -204,7 +213,7 @@ export async function Footer() {
           </p>
 
           <div className="flex flex-col items-center gap-3 md:flex-row md:gap-6">
-            {/* Redes sociales */}
+            {/* Redes sociales con URLs actualizadas al rebrand */}
             <div className="flex items-center gap-2">
               {socialLinks.map((social) => {
                 const Icon = social.Icon;

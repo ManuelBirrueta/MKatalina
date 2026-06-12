@@ -1,34 +1,78 @@
 /**
  * ============================================================================
- * PAGE: /[locale]/checkout/confirmacion — KATALINA (Fase 12 Turno 3B.3: bilingüe)
+ * PAGE: /[locale]/checkout/confirmacion — KATALINA (Fase 12 Turno 3B.4 fix)
  * ============================================================================
  *
- * Cambios respecto a la versión anterior:
- *   - import Link cambia de "next/link" a "@/i18n/navigation"
- *   - Todos los textos hardcoded ahora vienen de messages.json bajo el
- *     namespace checkout.confirmation
- *   - DEFENSIVE PARSING: `item.name` puede ser string (formato legacy)
- *     o LocalizedString (formato nuevo). Usamos getLocalizedSafe() para
- *     manejar ambos sin crashear
- *   - shippingMethod.label y shippingMethod.description también pueden
- *     ser string|LocalizedString — defensive parsing aplicado
- *
- * IMPORTANTE — sobre el OrderSnapshot:
- *   El tipo declara `name: string` pero los datos reales en sessionStorage
- *   pueden tener objetos {es, en} si la orden se creó después del Turno
- *   3B.1 sin que el código que construye el snapshot haya sido actualizado.
- *
- *   El fix DEFINITIVO es actualizar `[locale]/checkout/page.tsx` para que
- *   resuelva los nombres al locale antes de guardar el snapshot. Eso vendrá
- *   en el siguiente turno. Este archivo agrega defensa por si acaso.
+ * Cambios respecto a la versión anterior (Turno 3B.3):
+ *   - GuestAccountPrompt actualizado para consumir el nuevo contrato de
+ *     useAuth().register() que ahora devuelve `errorCode` en lugar de
+ *     `error` (cambio del Grupo D).
+ *   - PASSWORD_RULES ahora usa `messageKey` en lugar de `message` (cambio
+ *     del Grupo D). El componente resuelve los textos con tPasswordRules.
+ *   - Comentarios obsoletos eliminados/actualizados: las notas que decían
+ *     "esto se queda en español porque sería invasivo refactorizar" ya no
+ *     aplican porque ese refactor invasivo YA se hizo en el Grupo D.
  *
  * Lo que NO cambia:
- *   - La arquitectura de sub-componentes (FullConfirmation,
- *     MinimalConfirmation, GuestAccountPrompt, etc.)
+ *   - Toda la arquitectura del archivo (FullConfirmation, MinimalConfirmation,
+ *     GuestAccountPrompt, SuccessHeader, CTAButtons, InvalidOrderState)
+ *   - Defensive parsing de item.name y shippingMethod.label/description
  *   - El flujo de sessionStorage + URL param
- *   - Los CTAs y links
- *   - Los colores y layout
- * ============================================================================
+ *   - Las traducciones de checkout.confirmation.* (intactas)
+ *
+ * ─── DETALLE DEL FIX ───────────────────────────────────────────────────
+ *
+ * BUG 1 (línea original ~388): result.error
+ *   Antes:
+ *     setError(result.error ?? t("errorGeneric"));
+ *   Después:
+ *     setError(
+ *       result.errorCode
+ *         ? tAuthErrors(result.errorCode as any)
+ *         : t("errorGeneric")
+ *     );
+ *
+ *   Razón: useAuth().register() ahora devuelve { success, errorCode? } donde
+ *   errorCode es uno de: "registerEmptyFields" | "registerInvalidPassword" |
+ *   "registerEmailTaken". El componente traduce el código contra
+ *   auth.errors.{code}.
+ *
+ * BUG 2 (línea original ~430): rule.message
+ *   Antes:
+ *     <span>{rule.message}</span>
+ *   Después:
+ *     <span>{tPasswordRules(rule.messageKey as any)}</span>
+ *
+ *   Razón: PASSWORD_RULES ahora es PasswordRule[] con messageKey en lugar
+ *   de message. Las claves disponibles son "minChars" | "uppercase" | "number"
+ *   bajo el namespace auth.passwordRules.
+ *
+ * ─── POR QUÉ EL CAST A `any` ───────────────────────────────────────────
+ *
+ * next-intl tipa las claves de t() estrictamente con TypeScript. Cuando
+ * el código pasa una clave DINÁMICA (como result.errorCode que es un string
+ * en runtime), TS no puede verificar en compile-time que ese string sea
+ * una clave válida del namespace.
+ *
+ * Soluciones consideradas:
+ *
+ *   A) Verificar manualmente con un type guard:
+ *      const KNOWN_CODES = ["registerEmptyFields", ...] as const;
+ *      if (KNOWN_CODES.includes(result.errorCode)) { ... }
+ *      → Muy verboso, duplica info.
+ *
+ *   B) Cast a `any`:
+ *      tAuthErrors(result.errorCode as any)
+ *      → Pragmático. Confiamos en que el hook devuelve códigos válidos.
+ *
+ *   C) Tipar errorCode con el union literal:
+ *      errorCode?: "registerEmptyFields" | "registerInvalidPassword" | ...
+ *      → Mejor diseño pero requiere refactorizar el hook ahora.
+ *
+ * Elegimos B por simplicidad y consistencia con LoginForm/RegisterForm
+ * que ya usan este patrón. Cuando lleguemos a backend real, los códigos
+ * los define el server y este patrón se mantiene válido.
+ * ─────────────────────────────────────────────────────────────────────
  */
 
 "use client";
@@ -58,14 +102,6 @@ import type { Locale } from "@/i18n/routing";
 
 /**
  * Tipo del item de la orden con soporte para datos legacy.
- *
- * En la versión anterior del checkout, el snapshot guardaba `name: string`
- * (nombre ya resuelto). Pero si el código que construye el snapshot pasa
- * directamente `cartItem.product.name`, ahora será LocalizedString
- * porque cambiamos el tipo Product.
- *
- * Aceptamos AMBOS formatos para resiliencia. getLocalizedSafe() los
- * resuelve correctamente.
  */
 interface OrderItem {
   slug: string;
@@ -94,10 +130,6 @@ interface OrderSnapshot {
   };
   shippingMethod: {
     id: string;
-    /**
-     * Label puede ser string (legacy) o LocalizedString si el código
-     * que crea la orden cambió.
-     */
     label: string | LocalizedString;
     description: string | LocalizedString;
     price: number;
@@ -153,10 +185,6 @@ function FullConfirmation({ order }: { order: OrderSnapshot }) {
   const locale = useLocale() as Locale;
   const t = useTranslations("checkout.confirmation");
 
-  /**
-   * Resolver shippingMethod.label y description con defensive parsing.
-   * Pueden ser string o LocalizedString según cuándo se creó la orden.
-   */
   const shippingLabel = getLocalizedSafe(order.shippingMethod.label, locale);
   const shippingDescription = getLocalizedSafe(
     order.shippingMethod.description,
@@ -180,11 +208,6 @@ function FullConfirmation({ order }: { order: OrderSnapshot }) {
 
               <ul className="space-y-4 mb-6">
                 {order.items.map((item) => {
-                  /**
-                   * Defensive parsing: item.name puede ser string o
-                   * LocalizedString. getLocalizedSafe() devuelve siempre
-                   * un string que React puede renderizar.
-                   */
                   const itemName = getLocalizedSafe(item.name, locale);
 
                   return (
@@ -228,7 +251,6 @@ function FullConfirmation({ order }: { order: OrderSnapshot }) {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  {/* shippingLabel ya resuelto con defensive parsing arriba */}
                   <span className="text-muted-foreground">{shippingLabel}</span>
                   <span className="tabular-nums">
                     {formatPrice(order.shippingMethod.price)}
@@ -286,7 +308,6 @@ function FullConfirmation({ order }: { order: OrderSnapshot }) {
                   {t("estimatedTime.title")}
                 </h2>
 
-                {/* shippingDescription ya resuelto con defensive parsing */}
                 <p className="font-display text-lg font-medium">
                   {shippingDescription}
                 </p>
@@ -307,19 +328,25 @@ function FullConfirmation({ order }: { order: OrderSnapshot }) {
 /**
  * GuestAccountPrompt — banner que invita a invitados a crear cuenta.
  *
- * Toda la lógica original se mantiene. Solo cambian los textos hardcoded
- * por traducciones via namespace checkout.confirmation.guestAccount.
+ * CAMBIO Turno 3B.4 (fix):
+ *   - result.error → result.errorCode + tAuthErrors() para traducir
+ *   - rule.message → tPasswordRules(rule.messageKey) para traducir requisitos
  *
- * NOTA sobre PASSWORD_RULES.message:
- *   Los mensajes de los requisitos de password vienen de mock-users.ts en
- *   español. NO los traducimos en este turno — quedan en español incluso
- *   en /en. Para traducir correctamente, habría que refactorizar
- *   mock-users.ts para que cada regla tenga un id (no message) y mapear
- *   por id en messages.json. Es un cambio invasivo que dejamos para más
- *   adelante.
+ * Ahora los password rules y los errores del hook se muestran en el idioma
+ * activo (antes quedaban en español incluso en /en).
  */
 function GuestAccountPrompt({ order }: { order: OrderSnapshot }) {
   const t = useTranslations("checkout.confirmation.guestAccount");
+  /**
+   * Dos namespaces nuevos:
+   *   - tAuthErrors: para traducir result.errorCode del hook
+   *     (registerEmptyFields, registerInvalidPassword, registerEmailTaken)
+   *   - tPasswordRules: para traducir los requisitos de contraseña
+   *     (minChars, uppercase, number)
+   */
+  const tAuthErrors = useTranslations("auth.errors");
+  const tPasswordRules = useTranslations("auth.passwordRules");
+
   const { isAuthenticated, register } = useAuth();
 
   const [isCreating, setIsCreating] = useState(false);
@@ -380,12 +407,16 @@ function GuestAccountPrompt({ order }: { order: OrderSnapshot }) {
       setAccountCreated(true);
     } else {
       /**
-       * result.error viene del hook useAuth en español.
-       * Si quieres traducir esto también, habría que refactorizar useAuth
-       * para devolver códigos de error en lugar de mensajes.
-       * Por ahora, fallback a la traducción genérica.
+       * El hook ahora devuelve `errorCode` (no `error`).
+       * Traducimos el código contra el namespace auth.errors.
+       * Si por alguna razón no viene código, usamos el genérico
+       * del namespace guestAccount.errorGeneric.
        */
-      setError(result.error ?? t("errorGeneric"));
+      const errorMessage = result.errorCode
+        ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          tAuthErrors(result.errorCode as any)
+        : t("errorGeneric");
+      setError(errorMessage);
       setIsSubmitting(false);
     }
   };
@@ -475,9 +506,13 @@ function GuestAccountPrompt({ order }: { order: OrderSnapshot }) {
                 </div>
 
                 {/*
-                 * Requisitos de password.
-                 * rule.message viene en español de mock-users.ts.
-                 * No los traducimos en este turno (ver nota arriba).
+                 * Requisitos de password traducidos al idioma activo.
+                 * Cada rule.messageKey ("minChars" | "uppercase" | "number")
+                 * se resuelve contra auth.passwordRules.{key}.
+                 *
+                 * Cast a any necesario porque next-intl tipa estrictamente
+                 * las claves; el messageKey de PasswordRule es un union
+                 * literal pero el lookup dinámico necesita el cast.
                  */}
                 <ul className="mt-2 space-y-1">
                   {PASSWORD_RULES.map((rule, index) => {
@@ -491,7 +526,8 @@ function GuestAccountPrompt({ order }: { order: OrderSnapshot }) {
                         )}
                       >
                         {passes ? "✓" : "○"}
-                        <span>{rule.message}</span>
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                        <span>{tPasswordRules(rule.messageKey as any)}</span>
                       </li>
                     );
                   })}

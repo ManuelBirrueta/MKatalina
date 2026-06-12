@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * SITEMAP — KATALINA (Fase 12 Turno 3A: multilingüe)
+ * SITEMAP — MKATALINA (Fase 12 Turno 3A: multilingüe)
  * ============================================================================
  *
  * Generador de sitemap.xml dinámico que se sirve en /sitemap.xml.
@@ -15,14 +15,14 @@
  * Estructura del sitemap.xml resultante:
  *
  *   <url>
- *     <loc>https://katalina.mx/es/aretes</loc>
+ *     <loc>https://Mkatalina.mx/es/aretes</loc>
  *     <lastmod>2026-06-04</lastmod>
- *     <xhtml:link rel="alternate" hreflang="es" href="https://katalina.mx/es/aretes" />
- *     <xhtml:link rel="alternate" hreflang="en" href="https://katalina.mx/en/aretes" />
- *     <xhtml:link rel="alternate" hreflang="x-default" href="https://katalina.mx/es/aretes" />
+ *     <xhtml:link rel="alternate" hreflang="es" href="https://Mkatalina.mx/es/aretes" />
+ *     <xhtml:link rel="alternate" hreflang="en" href="https://Mkatalina.mx/en/aretes" />
+ *     <xhtml:link rel="alternate" hreflang="x-default" href="https://Mkatalina.mx/es/aretes" />
  *   </url>
  *   <url>
- *     <loc>https://katalina.mx/en/aretes</loc>
+ *     <loc>https://Mkatalina.mx/en/aretes</loc>
  *     ... (mismas alternates)
  *   </url>
  *
@@ -50,8 +50,8 @@ import { SITE_URL } from "@/lib/seo";
  *
  * Recibe un path como "/aretes" y devuelve:
  *   {
- *     es: "https://katalina.mx/es/aretes",
- *     en: "https://katalina.mx/en/aretes"
+ *     es: "https://Mkatalina.mx/es/aretes",
+ *     en: "https://Mkatalina.mx/en/aretes"
  *   }
  *
  * Cuando se pasa este objeto en `alternates.languages`, Next.js

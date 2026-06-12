@@ -1,73 +1,77 @@
 /**
  * ============================================================================
- * EMPTY CART — KATALINA
+ * EMPTY CART — KATALINA (Fase 12 Turno 3B.3: bilingüe)
  * ============================================================================
  *
- * Estado vacío de la página /carrito. Aparece cuando el usuario llega al
- * carrito sin items (recién llegado al sitio, o después de vaciarlo).
+ * Cambios respecto a la versión anterior:
+ *   - Pasa de Server a Client Component (necesario para useTranslations).
+ *     El padre /carrito ya era Client, así que no hay regresión real.
+ *   - import Link cambia a "@/i18n/navigation"
+ *   - Título, descripción y CTA principal traducidos desde "cart.empty.*"
+ *   - Las 4 pills de categorías ya no tienen labels hardcoded en español;
+ *     ahora resuelven sus labels desde "product.categories.{Enum}"
+ *     (mismo namespace usado en navegación, breadcrumbs, etc.)
  *
- * Por qué un componente dedicado en lugar de inline:
- *   - Encapsula el diseño del estado vacío para que sea reutilizable
- *   - Si en el futuro la "lógica" de qué mostrar cambia (ej. recomendaciones
- *     personalizadas), modificamos un solo archivo
+ * Lo que NO cambia:
+ *   - Estructura visual: icono grande + título + descripción + CTA + 4 pills
+ *   - Las RUTAS de las pills (/aretes, /collares, etc.) — las URLs son
+ *     siempre en español según la decisión arquitectural del proyecto
+ *     (routing.ts sin pathnames estrictas, ambos locales usan los mismos paths)
+ *   - El icono ShoppingBag con strokeWidth=1
  *
- * Anatomía visual:
+ * ─── SOBRE LAS PILLS DE CATEGORÍAS ────────────────────────────────────
  *
- *                    [icono de bolsa grande]
+ * Las pills son atajos visuales a las 4 categorías del sitio. Cada pill:
+ *   - Tiene un id (enum: "Aretes" | "Collares" | etc.) — estable, no se traduce
+ *   - Tiene un href (URL en español: /aretes, /collares, etc.) — estable
+ *   - Tiene un label visible — TRADUCIDO via t("product.categories.{id}")
  *
- *                  Tu carrito está vacío
- *
- *           Aún no has agregado ningún producto.
- *           Explora nuestra colección y encuentra
- *           algo que te enamore.
- *
- *              [Ver toda la colección]
- *
- *           [Aretes] [Collares] [Pulseras] [Gargantillas]
- *
- * Decisiones de diseño:
- *
- *   1. ICONO GRANDE EN COBRE: el ShoppingBag de lucide a 64px en color
- *      cobre. Da identidad visual y refuerza "esto es el carrito".
- *
- *   2. TONO CÁLIDO, NO TRISTE: el mensaje no dice "está vacío" como un
- *      reproche, sino que invita a explorar. Pequeña diferencia tonal
- *      grande diferencia emocional.
- *
- *   3. CTA PRIMARIO + LINKS DE CATEGORÍAS: damos dos niveles de elección.
- *      El CTA grande lleva a "/aretes" (la categoría con más tráfico
- *      típicamente). Los links pequeños debajo permiten ir directo a
- *      una categoría específica si ya tienen idea de qué buscar.
- *
- *   4. CENTRADO Y CON AIRE: todo en columna, centrado, padding generoso.
- *      No queremos que se sienta apretado.
+ * Esto reutiliza el mismo namespace que ProductCard, Breadcrumb, etc.
+ * Si en el futuro agregas una 5ta categoría, solo agregas la entrada
+ * en messages.json y la lista aquí.
+ * ─────────────────────────────────────────────────────────────────────
  * ============================================================================
  */
 
-import Link from "next/link";
+"use client";
+
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
  * Categorías a mostrar como atajos rápidos debajo del CTA principal.
- * Hardcoded por ahora — son las 4 categorías del sitio.
+ *
+ * Cada entry tiene:
+ *   - id: enum estable (mismas claves que en product.categories)
+ *   - href: URL del catálogo (siempre español, regardless del locale)
+ *
+ * El label visible se resuelve al renderizar con t("product.categories.{id}").
+ *
+ * El orden refleja la jerarquía visual del menú: Aretes primero (típicamente
+ * la categoría con más tráfico), luego Collares, Pulseras, Gargantillas.
  */
 const categoryShortcuts = [
-  { label: "Aretes", href: "/aretes" },
-  { label: "Collares", href: "/collares" },
-  { label: "Pulseras", href: "/pulseras" },
-  { label: "Gargantillas", href: "/gargantillas" },
-];
+  { id: "Aretes", href: "/aretes" },
+  { id: "Collares", href: "/collares" },
+  { id: "Pulseras", href: "/pulseras" },
+  { id: "Gargantillas", href: "/gargantillas" },
+] as const;
 
 export function EmptyCart() {
+  /**
+   * Dos namespaces:
+   *   - cart.empty: título, descripción, CTA principal
+   *   - product.categories: labels de las pills (Aretes/Earrings, etc.)
+   */
+  const t = useTranslations("cart.empty");
+  const tCategories = useTranslations("product.categories");
+
   return (
     <div className="py-20 lg:py-24 text-center">
-      {/*
-       * Icono grande en cobre.
-       * strokeWidth 1 lo hace verse más delicado/editorial que el default 2.
-       * Mismo principio que aplicamos en el icono del header.
-       */}
+      {/* Icono grande en cobre, strokeWidth 1 para look delicado */}
       <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-secondary-subtle mb-6">
         <ShoppingBag
           className="h-9 w-9 text-accent"
@@ -78,28 +82,24 @@ export function EmptyCart() {
 
       {/* Título principal */}
       <h2 className="font-display text-3xl md:text-4xl font-medium mb-3">
-        Tu carrito está vacío
+        {t("title")}
       </h2>
 
       {/* Mensaje invitando a explorar */}
       <p className="text-base text-muted-foreground max-w-md mx-auto mb-8">
-        Aún no has agregado ningún producto. Explora nuestra colección y
-        encuentra algo que te enamore.
+        {t("description")}
       </p>
 
-      {/* CTA principal */}
+      {/* CTA principal — botón grande hacia el catálogo */}
       <div className="mb-8">
         <Button asChild size="lg">
-          <Link href="/aretes">Ver toda la colección</Link>
+          <Link href="/aretes">{t("ctaButton")}</Link>
         </Button>
       </div>
 
       {/*
-       * Atajos rápidos a las 4 categorías.
-       *
-       * flex flex-wrap permite que se apilen en móvil si no caben.
-       * Cada link en estilo "pill" con borde sutil — visualmente discreto
-       * pero clickeable.
+       * Atajos rápidos a las 4 categorías como "pills" discretas.
+       * Cada label se resuelve desde product.categories.{id}.
        */}
       <div className="flex flex-wrap items-center justify-center gap-2">
         {categoryShortcuts.map((cat) => (
@@ -114,7 +114,7 @@ export function EmptyCart() {
               "transition-colors"
             )}
           >
-            {cat.label}
+            {tCategories(cat.id)}
           </Link>
         ))}
       </div>

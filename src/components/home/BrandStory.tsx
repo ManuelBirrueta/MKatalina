@@ -1,71 +1,55 @@
 /**
  * ============================================================================
- * BRAND STORY — KATALINA (Sección 4 de la Home)
+ * BRAND STORY — KATALINA (Fase 12 Turno 3B.3: bilingüe)
  * ============================================================================
  *
- * Sección editorial donde la marca cuenta SU HISTORIA. Es el alma del sitio,
- * lo que diferencia a Katalina de un e-commerce genérico de joyería.
+ * Cambios respecto a la versión anterior:
+ *   - Pasa de Server a Client Component (necesario para useTranslations).
+ *   - import Link cambia a "@/i18n/navigation".
+ *   - Todos los textos hardcoded traducidos desde "homepage.brandStory.*":
+ *     eyebrow, título en 2 líneas, 2 párrafos, CTA y placeholder de imagen.
  *
- * Anatomía visual:
+ * Lo que NO cambia:
+ *   - Estructura visual: grid 2 columnas asimétricas
+ *   - Imagen a la izquierda, texto a la derecha
+ *   - Aspect ratio 4:5 del placeholder
+ *   - CTA tipo link inline con flecha al hover
+ *   - Espacio negativo generoso entre elementos (space-y-6, etc.)
  *
- *   ┌──────────────────────────────────────────────────────────────────┐
- *   │  ┌──────────────┐    EYEBROW: Hecho con propósito                │
- *   │  │              │                                                │
- *   │  │              │    Hecho a mano                                │
- *   │  │  IMAGEN      │    en México                                   │
- *   │  │  (manos      │                                                │
- *   │  │  trabajando) │    Párrafo de 3-4 líneas contando la historia │
- *   │  │              │    de la marca, valores, proceso artesanal.    │
- *   │  │              │                                                │
- *   │  └──────────────┘    Conoce nuestra historia →                   │
- *   └──────────────────────────────────────────────────────────────────┘
+ * ─── PATRÓN: TÍTULO EN 2 LÍNEAS ────────────────────────────────────────
  *
- * Decisiones de diseño:
+ * El título original era:
+ *   <h2>
+ *     Hecho a mano<br />en México
+ *   </h2>
  *
- *   1. IMAGEN A LA IZQUIERDA, TEXTO A LA DERECHA: patrón clásico editorial.
- *      En contraste con el hero (texto izq, imagen der), este orden crea
- *      ritmo visual al hacer scroll: la página "respira" entre layouts.
+ * Para bilingüe usamos 2 keys separadas (titleLine1 + titleLine2) en lugar
+ * de una sola con \n. Razón: cada idioma controla su quiebre de línea sin
+ * forzar al otro. En inglés sería "Handmade / in Mexico" — mismo patrón
+ * de 2 líneas pero con palabras de longitudes distintas.
  *
- *   2. IMAGEN DE PROCESO, NO DE PRODUCTO: aquí queremos foto de manos
- *      trabajando, herramientas, el taller. NO joyería terminada (esa va
- *      en el hero y en los productos destacados).
- *
- *   3. TEXTO MÁS LARGO QUE EN OTRAS SECCIONES: aquí es donde dejamos
- *      que la marca hable. 3-4 líneas en lugar de 1-2.
- *
- *   4. CTA TIPO LINK (NO BOTÓN): el call-to-action aquí es "leer más" no
- *      "comprar ahora". El link inline con flecha lo refleja perfectamente.
- *
- *   5. FONDO LIGERAMENTE OSCURO: bg-muted en lugar del background normal.
- *      Otra forma de crear "bandas" sutiles entre secciones.
+ * Es el mismo patrón que aplicamos en el Hero del Turno A.
+ * ─────────────────────────────────────────────────────────────────────
  * ============================================================================
  */
 
-import Link from "next/link";
+"use client";
+
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { ArrowRight } from "lucide-react";
 import { Container } from "@/components/layout/Container";
 import { cn } from "@/lib/utils";
 
 export function BrandStory() {
+  const t = useTranslations("homepage.brandStory");
+
   return (
     <section className="py-24">
       <Container>
-        {/*
-         * GRID DE 2 COLUMNAS asimétricas:
-         *   - lg:grid-cols-2 = dos columnas IGUALES en desktop
-         *   - En móvil: stack vertical (imagen arriba, texto debajo)
-         *
-         * gap-12 lg:gap-20 = más espacio en desktop entre las dos columnas
-         * para que el conjunto no se sienta apretado.
-         *
-         * items-center = ambas columnas se centran verticalmente entre sí.
-         * Si el texto es más corto que la imagen, queda centrado.
-         */}
+        {/* Grid 2 columnas iguales en desktop, stack en móvil */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-          {/*
-           * ─── IMAGEN ───
-           * Placeholder con aspect 4:5 (el formato editorial estándar).
-           */}
+          {/* ─── IMAGEN (placeholder) ─── */}
           <div className="order-1">
             <div
               className={cn(
@@ -76,33 +60,25 @@ export function BrandStory() {
             >
               <div className="text-center px-8">
                 <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground mb-2">
-                  Imagen taller
+                  {t("imagePlaceholderEyebrow")}
                 </p>
                 <p className="font-display text-lg text-foreground">
-                  Foto de manos artesanales
+                  {t("imagePlaceholderTextLine1")}
                   <br />
-                  trabajando una pieza
+                  {t("imagePlaceholderTextLine2")}
                 </p>
               </div>
             </div>
           </div>
 
-          {/*
-           * ─── TEXTO ───
-           * space-y-6 = 24px de separación entre cada elemento (eyebrow,
-           * título, párrafos, CTA). Más aire que en hero porque aquí el
-           * texto es protagonista.
-           */}
+          {/* ─── TEXTO ─── */}
           <div className="order-2 space-y-6">
+            {/* Eyebrow en mayúsculas cobre */}
             <p className="text-xs uppercase tracking-[0.3em] text-accent">
-              Hecho con propósito
+              {t("eyebrow")}
             </p>
 
-            {/*
-             * Título: ligeramente más chico que el hero (text-5xl en lugar
-             * de text-7xl). Razón: el hero es el "grito" principal de la
-             * página; las otras secciones son "conversaciones".
-             */}
+            {/* Título en 2 líneas controladas por keys separadas */}
             <h2
               className={cn(
                 "font-display font-medium",
@@ -110,33 +86,21 @@ export function BrandStory() {
                 "leading-[1.1] tracking-tight"
               )}
             >
-              Hecho a mano
+              {t("titleLine1")}
               <br />
-              en México
+              {t("titleLine2")}
             </h2>
 
             {/*
-             * Párrafos del story. Dos párrafos cortos en lugar de uno
-             * largo: más legible, más editorial.
-             *
-             * max-w-md = 28rem (~448px). Importante para legibilidad:
-             * texto largo en líneas anchas cansa al lector.
+             * 2 párrafos editoriales.
+             * max-w-md mantiene la legibilidad (~448px de ancho máximo).
              */}
             <div className="space-y-4 text-base text-muted-foreground leading-relaxed max-w-md">
-              <p>
-                Cada pieza de Katalina nace en un pequeño taller en el centro
-                de México, donde manos expertas combinan técnicas tradicionales
-                con diseño contemporáneo.
-              </p>
-              <p>
-                Trabajamos con plata 925, oro rosa y piedras naturales,
-                eligiendo materiales que envejecen con gracia y que tienen
-                una historia detrás. Sin producción masiva. Sin desperdicio.
-                Solo piezas pensadas para durar.
-              </p>
+              <p>{t("paragraph1")}</p>
+              <p>{t("paragraph2")}</p>
             </div>
 
-            {/* CTA tipo link */}
+            {/* CTA tipo link inline con flecha animada al hover */}
             <Link
               href="/quienes-somos"
               className={cn(
@@ -146,7 +110,7 @@ export function BrandStory() {
                 "border-b border-foreground hover:border-accent pb-1"
               )}
             >
-              Conoce nuestra historia
+              {t("ctaLink")}
               <ArrowRight
                 size={14}
                 className="transition-transform duration-300 group-hover:translate-x-1"

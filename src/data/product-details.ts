@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * PRODUCT DETAILS DATA — KATALINA (Fase 12 Turno 3B.1: bilingüe)
+ * PRODUCT DETAILS DATA — MKATALINA (Fase 12 Turno 3B.1: bilingüe)
  * ============================================================================
  *
  * Cambios respecto a la versión anterior:
@@ -283,8 +283,8 @@ export function defaultExtras(material: string): ProductExtras {
 
   const description: LocalizedString =
     materialDescriptions[material] ?? {
-      es: "Pieza artesanal Katalina, hecha a mano en México con materiales de calidad.\n\nParte de nuestra colección curada. Cada pieza pasa por revisión de calidad antes de ser empacada en nuestra caja con sello, lista para regalar.",
-      en: "Katalina artisanal piece, handmade in Mexico with quality materials.\n\nPart of our curated collection. Each piece undergoes quality inspection before being packed in our sealed box, ready to gift.",
+      es: "Pieza artesanal MKatalina, hecha a mano en México con materiales de calidad.\n\nParte de nuestra colección curada. Cada pieza pasa por revisión de calidad antes de ser empacada en nuestra caja con sello, lista para regalar.",
+      en: "MKatalina artisanal piece, handmade in Mexico with quality materials.\n\nPart of our curated collection. Each piece undergoes quality inspection before being packed in our sealed box, ready to gift.",
     };
 
   // ─── Cuidados genéricos bilingues según material ───

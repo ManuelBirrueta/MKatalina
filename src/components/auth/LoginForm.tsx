@@ -1,74 +1,99 @@
 /**
  * ============================================================================
- * LOGIN FORM — KATALINA
+ * LOGIN FORM — KATALINA (Fase 12 Turno 3B.4: bilingüe completo)
  * ============================================================================
  *
- * Formulario de inicio de sesión. Dos campos: email y contraseña.
+ * Cambios respecto a la versión anterior:
+ *   - Imports actualizados:
+ *     * Link de "next/link" → "@/i18n/navigation" (mantiene prefijo locale)
+ *     * useRouter de "next/navigation" → "@/i18n/navigation"
+ *     * useSearchParams se queda en "next/navigation" (no necesita i18n)
+ *   - useTranslations agregado para namespace "auth.login", "auth.shared", etc.
+ *   - validateField recibe `t` como parámetro (igual patrón que CheckoutForm)
+ *   - El submitError ahora es un errorCode + un t para resolverlo
+ *   - Todos los textos hardcoded traducidos (labels, placeholders, botones,
+ *     aria-labels, toasts)
  *
- * Validación:
- *   - Email: requerido + formato válido
- *   - Contraseña: requerida (no validamos las reglas de complejidad aquí
- *     porque podría ser que el usuario tenga una cuenta vieja con
- *     contraseña que ya no cumple — solo bloqueamos el campo vacío)
+ * Lo que NO cambia:
+ *   - Estructura visual: campos email + password con toggle de visibilidad
+ *   - Link "¿Olvidaste tu contraseña?" sigue mostrando toast pending
+ *   - Banner de error rojo arriba del formulario
+ *   - Lógica de validación (onBlur, onChange, onSubmit, validateAll)
+ *   - Redirección post-login con ?redirect=
  *
- * Features:
- *   - Toggle de visibilidad de contraseña (icono de ojo)
- *   - Link "¿Olvidaste tu contraseña?" (placeholder por ahora, llevará a
- *     `/recuperar-contrasena` que veremos en Fase 12 con email real)
- *   - Manejo de error del backend: si el hook useAuth devuelve error,
- *     lo mostramos en un banner rojo arriba del formulario
- *   - Redirección post-login: si vino con ?redirect=X, navega ahí
- *     después del login exitoso. Si no, navega al home.
+ * ─── PATRÓN PARA EL ERROR DEL HOOK ────────────────────────────────────
  *
- * Estado del form:
- *   Todo el estado vive en este componente porque no se comparte con
- *   nadie. No hace falta lift al padre.
+ * Antes:
+ *   const result = await login(...);
+ *   if (!result.success) {
+ *     setSubmitError(result.error ?? "Error al iniciar sesión");
+ *   }
  *
- * Validación timing:
- *   - onBlur: valida el campo que el usuario acaba de dejar (no agresivo)
- *   - onSubmit: valida todos los campos antes de intentar login
- *   - onChange: si el campo tenía error, limpia el error al empezar a
- *     escribir de nuevo (UX cómoda)
- * ============================================================================
+ * Ahora:
+ *   const result = await login(...);
+ *   if (!result.success) {
+ *     setSubmitError(
+ *       result.errorCode
+ *         ? tErrors(result.errorCode)
+ *         : tLogin("fallbackError")
+ *     );
+ *   }
+ *
+ * El hook devuelve un código identificable. El componente lo traduce
+ * usando t() del namespace auth.errors. Si por alguna razón no viene
+ * código (no debería pasar), cae al fallback "Sign in failed".
+ *
+ * IMPORTANTE: usamos `as keyof Messages["auth"]["errors"]` o `as any` para
+ * permitir el lookup dinámico. next-intl es estricto con las claves; al
+ * pasarle un string dinámico, TypeScript se queja. Lo resolvemos con cast.
+ * ─────────────────────────────────────────────────────────────────────
  */
 
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, useRouter } from "@/i18n/navigation";
 import { Eye, EyeOff, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-/**
- * Errores del formulario por campo.
- */
 interface FormErrors {
   email?: string;
   password?: string;
 }
 
 /**
- * Validar un campo individual. Misma idea que en CheckoutForm.
+ * Tipo de la función traductora que pasamos a validateField.
+ * Liberal (acepta cualquier key) por simplicidad.
+ */
+type ValidateFn = (key: string) => string;
+
+/**
+ * Validar un campo individual.
+ *
+ * Cambio: recibe `t` para resolver los mensajes de error desde messages.json.
+ * El `t` viene del namespace "auth.validation" en el componente caller.
  */
 function validateField(
   field: "email" | "password",
-  value: string
+  value: string,
+  t: ValidateFn
 ): string | undefined {
   const trimmed = value.trim();
 
   if (field === "email") {
-    if (!trimmed) return "El email es obligatorio";
+    if (!trimmed) return t("emailRequired");
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(trimmed)) return "Formato de email inválido";
+    if (!emailRegex.test(trimmed)) return t("emailInvalid");
     return undefined;
   }
 
   if (field === "password") {
-    if (!value) return "La contraseña es obligatoria";
+    if (!value) return t("passwordRequired");
     return undefined;
   }
 
@@ -80,78 +105,67 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const { login } = useAuth();
 
-  // Estado de los campos
+  // 4 namespaces para los distintos tipos de textos
+  const tLogin = useTranslations("auth.login");
+  const tShared = useTranslations("auth.shared");
+  const tValidation = useTranslations("auth.validation");
+  const tErrors = useTranslations("auth.errors");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  // Estado de errores
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Estado de "enviando"
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  /**
-   * Validar todos los campos antes de enviar.
-   * Devuelve true si todo OK.
-   */
   const validateAll = (): boolean => {
     const newErrors: FormErrors = {};
 
-    const emailError = validateField("email", email);
+    const emailError = validateField("email", email, tValidation);
     if (emailError) newErrors.email = emailError;
 
-    const passwordError = validateField("password", password);
+    const passwordError = validateField("password", password, tValidation);
     if (passwordError) newErrors.password = passwordError;
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  /**
-   * Handler del submit.
-   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Limpiar error previo del submit
     setSubmitError(null);
 
-    // Validar campos
     if (!validateAll()) return;
 
     setIsSubmitting(true);
 
-    // Llamar al login del hook
     const result = await login(email, password);
 
     if (result.success) {
-      // Éxito: mostrar toast y redirigir
-      toast.success("Sesión iniciada", {
-        description: "Bienvenida de vuelta a Katalina",
+      toast.success(tLogin("toastSuccessTitle"), {
+        description: tLogin("toastSuccessDescription"),
       });
 
-      /**
-       * Redirección post-login:
-       *   - Si vino con ?redirect=X, navegar ahí
-       *   - Si no, navegar al home
-       *
-       * El parámetro redirect lo agregan los guards de ruta cuando un
-       * usuario sin sesión intenta acceder a una página privada.
-       */
       const redirectTo = searchParams.get("redirect") ?? "/";
       router.push(redirectTo);
     } else {
-      // Error: mostrar mensaje
-      setSubmitError(result.error ?? "Error al iniciar sesión");
+      /**
+       * Traducir el errorCode del hook.
+       * Si no viene errorCode (no debería pasar), usar fallback.
+       * Cast a any porque tErrors espera claves estáticas pero
+       * nuestro código es dinámico.
+       */
+      const errorMessage = result.errorCode
+        ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          tErrors(result.errorCode as any)
+        : tLogin("fallbackError");
+      setSubmitError(errorMessage);
       setIsSubmitting(false);
     }
   };
 
-  /**
-   * Helper de clases del input. Agrega borde rojo si hay error en ese campo.
-   */
   const inputClass = (field: keyof FormErrors) =>
     cn(
       "w-full h-11 px-3",
@@ -163,11 +177,7 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {/*
-       * Banner de error del submit.
-       * Aparece solo si el login falló con un mensaje del servidor.
-       * Se limpia al cambiar cualquier campo.
-       */}
+      {/* Banner de error del submit */}
       {submitError && (
         <div
           role="alert"
@@ -189,7 +199,7 @@ export function LoginForm() {
           htmlFor="login-email"
           className="block text-sm font-medium mb-1.5"
         >
-          Email
+          {tLogin("emailLabel")}
         </label>
         <input
           id="login-email"
@@ -199,18 +209,16 @@ export function LoginForm() {
           value={email}
           onChange={(e) => {
             setEmail(e.target.value);
-            // Limpiar error del campo al escribir
             if (errors.email) {
               setErrors((prev) => ({ ...prev, email: undefined }));
             }
-            // Limpiar error del submit también
             if (submitError) setSubmitError(null);
           }}
           onBlur={() => {
-            const error = validateField("email", email);
+            const error = validateField("email", email, tValidation);
             if (error) setErrors((prev) => ({ ...prev, email: error }));
           }}
-          placeholder="tu@email.com"
+          placeholder={tShared("emailPlaceholder")}
           autoFocus
           className={inputClass("email")}
         />
@@ -221,38 +229,30 @@ export function LoginForm() {
         )}
       </div>
 
-      {/* Contraseña */}
+      {/* Contraseña con link "olvidé contraseña" alineado a la derecha */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <label htmlFor="login-password" className="block text-sm font-medium">
-            Contraseña
+            {tLogin("passwordLabel")}
           </label>
           {/*
-           * Link "Olvidé mi contraseña" alineado a la derecha del label.
-           * Placeholder por ahora — llevará a /recuperar-contrasena que
-           * construiremos en Fase 12 cuando tengamos email real con Resend.
+           * Link "Olvidé mi contraseña" — placeholder por ahora.
+           * Muestra toast pending hasta que tengamos email real.
            */}
           <Link
             href="/recuperar-contrasena"
             className="text-xs text-muted-foreground hover:text-accent transition-colors"
             onClick={(e) => {
-              // Por ahora, mostrar toast en lugar de navegar a página que no existe
               e.preventDefault();
-              toast.info("Recuperar contraseña pendiente", {
-                description:
-                  "Esta función estará disponible cuando integremos el backend.",
+              toast.info(tLogin("forgotToastTitle"), {
+                description: tLogin("forgotToastDescription"),
               });
             }}
           >
-            ¿Olvidaste tu contraseña?
+            {tLogin("forgotPassword")}
           </Link>
         </div>
 
-        {/*
-         * Wrapper relativo para posicionar el botón del ojo absoluto.
-         * El input tiene padding-right grande para que el texto no se
-         * superponga con el icono.
-         */}
         <div className="relative">
           <input
             id="login-password"
@@ -267,23 +267,20 @@ export function LoginForm() {
               if (submitError) setSubmitError(null);
             }}
             onBlur={() => {
-              const error = validateField("password", password);
+              const error = validateField("password", password, tValidation);
               if (error) setErrors((prev) => ({ ...prev, password: error }));
             }}
             className={cn(inputClass("password"), "pr-10")}
           />
-          {/*
-           * Botón toggle de visibilidad.
-           * Icono cambia entre Eye (cuando contraseña oculta) y EyeOff
-           * (cuando visible). aria-label dinámico para screen readers.
-           */}
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             aria-label={
-              showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
+              showPassword
+                ? tShared("hidePassword")
+                : tShared("showPassword")
             }
-            tabIndex={-1} // No incluir en orden de tabulación
+            tabIndex={-1}
             className={cn(
               "absolute right-3 top-1/2 -translate-y-1/2",
               "text-muted-foreground hover:text-foreground transition-colors",
@@ -312,7 +309,7 @@ export function LoginForm() {
         disabled={isSubmitting}
         className="w-full"
       >
-        {isSubmitting ? "Iniciando sesión..." : "Iniciar sesión"}
+        {isSubmitting ? tLogin("submitting") : tLogin("submitButton")}
       </Button>
     </form>
   );

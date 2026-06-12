@@ -1,222 +1,183 @@
 /**
  * ============================================================================
- * CATEGORIES GRID — KATALINA (Sección 2 de la Home)
+ * CATEGORIES GRID — KATALINA (Fase 12 Turno 3B.3: bilingüe)
  * ============================================================================
  *
- * Grid de 4 cards grandes una por categoría: Aretes, Collares, Pulseras,
- * Gargantillas. Cada card es una imagen con el nombre en serif sobre ella.
+ * Cambios respecto a la versión anterior:
+ *   - Pasa de Server a Client Component (useTranslations)
+ *   - import Link cambia a "@/i18n/navigation"
+ *   - El array `categories` ya no tiene labels ni taglines hardcoded —
+ *     solo guarda el ID (enum) y el href. Los textos visibles se resuelven
+ *     en runtime con t() desde namespaces existentes/nuevos:
+ *       - label  → product.categories.{id}  (reutilizado, ya existe)
+ *       - tagline → homepage.categoriesGrid.taglines.{id}  (nuevo)
+ *       - alt    → homepage.categoriesGrid.imageAlt  (interpolando category)
  *
- * Anatomía visual:
+ * Lo que NO cambia:
+ *   - Estructura visual: 2 columnas móvil / 4 columnas desktop
+ *   - Aspect ratio 3:4 de las cards
+ *   - Gradiente oscuro inferior para legibilidad del nombre
+ *   - Hover: zoom + cambio de color del nombre a cobre claro
+ *   - Las RUTAS (/aretes, /collares, etc.) siempre en español
  *
- *   ┌──────────────────────────────────────────────────────────────────┐
- *   │                  EYEBROW: Categorías                             │
- *   │                  Explora la colección                            │
- *   │                                                                  │
- *   │  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐                  │
- *   │  │        │  │        │  │        │  │        │                  │
- *   │  │ IMG    │  │ IMG    │  │ IMG    │  │ IMG    │                  │
- *   │  │        │  │        │  │        │  │        │                  │
- *   │  │        │  │        │  │        │  │        │                  │
- *   │  │ Aretes │  │Collares│  │Pulseras│  │ Garg.  │                  │
- *   │  └────────┘  └────────┘  └────────┘  └────────┘                  │
- *   └──────────────────────────────────────────────────────────────────┘
+ * ─── ARQUITECTURA DEL ARRAY DE CATEGORÍAS ──────────────────────────────
  *
- * Decisiones de diseño:
+ * El array `categories` ahora solo tiene id + href + datos NO traducibles
+ * (la ruta de la imagen). Esto es el mismo patrón que usamos en EmptyCart,
+ * FilterSidebar, etc.:
  *
- *   1. CADA CARD ES UN LINK COMPLETO: tap en cualquier parte (imagen o
- *      nombre) navega a la página de categoría. Mismo patrón que ProductCard.
+ *   - id: enum estable, sirve como clave para traducciones
+ *   - href: URL en español (decisión arquitectural del proyecto)
+ *   - image.src: ruta del asset (no se traduce; cuando haya CMS, puede
+ *     venir en su propio campo bilingüe)
  *
- *   2. NOMBRE DENTRO DE LA IMAGEN (NO DEBAJO): es la convención de cards
- *      de categoría tipo Pandora/Tiffany. El nombre se superpone a la
- *      imagen en la parte inferior, con un gradiente sutil para legibilidad.
- *      Crea más impacto visual que tener el nombre debajo separado.
- *
- *   3. ASPECT RATIO 3:4 (NO 4:5 COMO PRODUCTOS): las categorías son un
- *      poco más cuadradas que los productos para diferenciarlas visualmente.
- *
- *   4. HOVER: zoom de imagen + el nombre cambia a cobre. Sutil pero presente.
+ * Los labels y taglines se construyen al render con useTranslations.
+ * Esto centraliza las traducciones y permite que un cambio en messages.json
+ * se refleje sin tocar el código.
+ * ─────────────────────────────────────────────────────────────────────
  * ============================================================================
  */
 
-import Link from "next/link";
+"use client";
+
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { Container } from "@/components/layout/Container";
 import { cn } from "@/lib/utils";
 
 /**
- * Category — estructura de una categoría a mostrar.
+ * Category — estructura interna de cada card.
  *
- * Cuando integremos el CMS (Fase 6), esto vendrá de Sanity. Mientras,
- * vive aquí hardcoded.
+ * Sin labels ni taglines: esos se resuelven en el render.
+ * Solo guardamos lo que ES estable: enum ID, URL, ruta de imagen.
  */
 interface Category {
-  /** Nombre que aparece en la card (ej. "Aretes") */
-  label: string;
-  /** Descripción breve opcional debajo del nombre */
-  tagline: string;
-  /** Ruta de la página de la categoría */
+  /** ID enum: misma clave que en product.categories y homepage.categoriesGrid.taglines */
+  id: "Aretes" | "Collares" | "Pulseras" | "Gargantillas";
+  /** Ruta de la página de la categoría (siempre español) */
   href: string;
-  /** Imagen representativa de la categoría */
+  /** Imagen representativa */
   image: {
     src: string;
-    alt: string;
   };
 }
 
 const categories: Category[] = [
   {
-    label: "Aretes",
-    tagline: "Desde minimalistas hasta statement",
+    id: "Aretes",
     href: "/aretes",
-    image: {
-      src: "/placeholder-cat-aretes.jpg",
-      alt: "Aretes Katalina sobre fondo neutro",
-    },
+    image: { src: "/placeholder-cat-aretes.jpg" },
   },
   {
-    label: "Collares",
-    tagline: "Dijes, cadenas y personalizados",
+    id: "Collares",
     href: "/collares",
-    image: {
-      src: "/placeholder-cat-collares.jpg",
-      alt: "Collares Katalina sobre fondo neutro",
-    },
+    image: { src: "/placeholder-cat-collares.jpg" },
   },
   {
-    label: "Pulseras",
-    tagline: "Brazaletes, charms y tejidas",
+    id: "Pulseras",
     href: "/pulseras",
-    image: {
-      src: "/placeholder-cat-pulseras.jpg",
-      alt: "Pulseras Katalina sobre fondo neutro",
-    },
+    image: { src: "/placeholder-cat-pulseras.jpg" },
   },
   {
-    label: "Gargantillas",
-    tagline: "Piezas que abrazan con elegancia",
+    id: "Gargantillas",
     href: "/gargantillas",
-    image: {
-      src: "/placeholder-cat-gargantillas.jpg",
-      alt: "Gargantillas Katalina sobre fondo neutro",
-    },
+    image: { src: "/placeholder-cat-gargantillas.jpg" },
   },
 ];
 
 export function CategoriesGrid() {
+  /**
+   * 3 namespaces que usamos en esta sección:
+   *   - t (homepage.categoriesGrid): eyebrow, title, taglines, imageAlt
+   *   - tCategories (product.categories): labels reutilizables
+   *
+   * Reutilizamos product.categories para las etiquetas porque ya están
+   * mapeadas ahí desde el catálogo, breadcrumbs, etc. Una sola fuente
+   * de verdad para "Aretes" → "Earrings".
+   */
+  const t = useTranslations("homepage.categoriesGrid");
+  const tCategories = useTranslations("product.categories");
+
   return (
-    /**
-     * <section> con padding vertical generoso.
-     * py-section = 96px arriba y abajo (definido en globals.css como token).
-     */
     <section className="py-24">
       <Container>
-        {/*
-         * Header de sección: eyebrow + título centrados.
-         * Patrón repetible que vamos a usar también en "Productos destacados".
-         */}
+        {/* Header de la sección */}
         <header className="text-center mb-12">
           <p className="text-xs uppercase tracking-[0.3em] text-accent mb-3">
-            Categorías
+            {t("eyebrow")}
           </p>
           <h2 className="font-display text-4xl md:text-5xl font-medium">
-            Explora la colección
+            {t("title")}
           </h2>
         </header>
 
-        {/*
-         * GRID RESPONSIVO:
-         *   - móvil: 2 columnas
-         *   - tablet: 2 columnas (mismo, pero más grandes)
-         *   - desktop: 4 columnas (todas en una sola fila)
-         *
-         * gap-4 horizontal, gap-y-6 vertical: poco espacio entre cards
-         * para que se sientan como "exhibición coherente" en lugar de
-         * elementos sueltos.
-         */}
+        {/* Grid 2 cols móvil / 4 cols desktop */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-          {categories.map((category) => (
-            <Link
-              key={category.label}
-              href={category.href}
-              className="group block"
-            >
-              {/*
-               * Contenedor de la imagen + nombre superpuesto.
-               *
-               * aspect-[3/4] = formato un poco más cuadrado que productos
-               * (que usan 4/5). Diferencia visual sutil pero deliberada.
-               *
-               * overflow-hidden es CRÍTICO porque la imagen va a escalar 105%
-               * al hover y necesitamos cortar el desborde.
-               */}
-              <div
-                className={cn(
-                  "relative aspect-[3/4] w-full overflow-hidden",
-                  "bg-secondary-subtle"
-                )}
-              >
-                {/*
-                 * Placeholder de imagen. Misma estrategia que en ProductCard:
-                 * detecta el prefix "/placeholder" y muestra placeholder visual.
-                 *
-                 * Cuando tengas fotos reales, reemplaza por <Image> de next/image.
-                 */}
-                {category.image.src.startsWith("/placeholder") ? (
-                  <div
-                    className={cn(
-                      "absolute inset-0 flex items-center justify-center",
-                      "transition-transform duration-700",
-                      "group-hover:scale-105"
-                    )}
-                  >
-                    <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                      Imagen {category.label}
-                    </span>
-                  </div>
-                ) : (
-                  // Aquí iría <Image src={category.image.src} ... />
-                  null
-                )}
+          {categories.map((category) => {
+            /**
+             * Resolver textos por categoría:
+             *   - label: nombre visible (Aretes / Earrings)
+             *   - tagline: descripción corta debajo del nombre
+             *   - imageAlt: alt text del placeholder (interpolando category)
+             *   - placeholder: texto del placeholder visual
+             */
+            const label = tCategories(category.id);
+            const tagline = t(`taglines.${category.id}`);
 
-                {/*
-                 * Gradiente oscuro en la parte inferior de la imagen.
-                 * Garantiza legibilidad del nombre superpuesto sobre cualquier
-                 * tipo de imagen (clara, oscura, multicolor).
-                 *
-                 * from-black/60 = empieza en negro 60% opacidad abajo
-                 * to-transparent = se desvanece a transparente arriba
-                 * h-1/3 = ocupa el tercio inferior de la imagen
-                 */}
+            return (
+              <Link
+                key={category.id}
+                href={category.href}
+                className="group block"
+              >
                 <div
                   className={cn(
-                    "absolute bottom-0 left-0 right-0 h-1/3",
-                    "bg-gradient-to-t from-black/60 to-transparent",
-                    "pointer-events-none" // No bloquea clicks al link padre
+                    "relative aspect-[3/4] w-full overflow-hidden",
+                    "bg-secondary-subtle"
                   )}
-                />
+                >
+                  {/* Placeholder visual (en producción: <Image>) */}
+                  {category.image.src.startsWith("/placeholder") ? (
+                    <div
+                      className={cn(
+                        "absolute inset-0 flex items-center justify-center",
+                        "transition-transform duration-700",
+                        "group-hover:scale-105"
+                      )}
+                    >
+                      <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                        {t("imagePlaceholder", { category: label })}
+                      </span>
+                    </div>
+                  ) : null}
 
-                {/*
-                 * Nombre de la categoría superpuesto en la parte inferior.
-                 * Color blanco para contrastar con el gradiente oscuro.
-                 */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 lg:p-6">
-                  <h3
+                  {/* Gradiente para legibilidad del nombre */}
+                  <div
                     className={cn(
-                      "font-display text-2xl lg:text-3xl font-medium",
-                      "text-white",
-                      // Hover: el nombre cambia a cobre claro
-                      "transition-colors duration-300",
-                      "group-hover:text-accent-subtle"
+                      "absolute bottom-0 left-0 right-0 h-1/3",
+                      "bg-gradient-to-t from-black/60 to-transparent",
+                      "pointer-events-none"
                     )}
-                  >
-                    {category.label}
-                  </h3>
-                  <p className="text-xs text-white/80 mt-1">
-                    {category.tagline}
-                  </p>
+                  />
+
+                  {/* Nombre + tagline superpuestos */}
+                  <div className="absolute bottom-0 left-0 right-0 p-4 lg:p-6">
+                    <h3
+                      className={cn(
+                        "font-display text-2xl lg:text-3xl font-medium",
+                        "text-white",
+                        "transition-colors duration-300",
+                        "group-hover:text-accent-subtle"
+                      )}
+                    >
+                      {label}
+                    </h3>
+                    <p className="text-xs text-white/80 mt-1">{tagline}</p>
+                  </div>
                 </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       </Container>
     </section>

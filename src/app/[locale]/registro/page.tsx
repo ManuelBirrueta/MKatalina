@@ -1,28 +1,49 @@
 /**
  * ============================================================================
- * PAGE: /registro — KATALINA
+ * PAGE: /[locale]/registro — KATALINA (Fase 12 Turno 3B.4: bilingüe)
  * ============================================================================
  *
- * Página de creación de cuenta.
+ * Cambios respecto a la versión anterior:
+ *   - import useRouter cambia de "next/navigation" a "@/i18n/navigation".
+ *   - useTranslations agregado con namespace "auth.register" (y reutilizamos
+ *     "auth.login" para el separador "o", ya que es el mismo texto en ambas
+ *     páginas).
+ *   - Todos los strings hardcoded traducidos antes de pasarlos como props
+ *     a AuthLayout y GoogleLoginButton.
  *
- * Estructura idéntica a /login pero con RegisterForm en lugar de LoginForm.
- * El AuthLayout se reutiliza con título y subtítulo diferentes.
+ * Lo que NO cambia:
+ *   - Estructura: AuthLayout + RegisterForm + separador + GoogleLoginButton
+ *   - Guard de redirección si ya hay sesión
+ *   - Suspense boundary
+ *   - El label del botón Google es DIFERENTE al de /login:
+ *     "Registrarse con Google" en lugar de "Continuar con Google"
  *
- * Como en /login: si ya hay sesión activa, redirigimos al home porque no
- * tiene sentido mostrar el form de registro.
+ * ─── REUTILIZACIÓN DE auth.login.orSeparator ────────────────────────────
  *
- * Tras registro exitoso, el RegisterForm internamente:
- *   1. Llama register() del hook
- *   2. Si OK, el hook automáticamente inicia sesión (no hay que llamar login)
- *   3. Muestra toast de bienvenida
- *   4. Redirige según ?redirect= o al home
- * ============================================================================
+ * El separador "o" / "or" es idéntico en ambas páginas. Para no duplicar
+ * la clave (auth.register.orSeparator = auth.login.orSeparator), llamamos
+ * useTranslations dos veces:
+ *   - tRegister para los textos propios de registro
+ *   - tLogin para el separador compartido
+ *
+ * Alternativa: mover orSeparator a auth.shared. Es más limpio
+ * conceptualmente, pero solo lo usan estas 2 páginas, así que duplicar
+ * tampoco era el fin del mundo. Por consistencia con auth.shared (que
+ * ya tiene emailPlaceholder, showPassword, hidePassword) podríamos
+ * moverlo ahí en un futuro pulido. Por ahora vive en auth.login.
+ *
+ * ─── alternateAction APUNTA A "/login" ─────────────────────────────────
+ *
+ * Decisión arquitectural: rutas en español. Link de @/i18n/navigation
+ * prefija el locale automáticamente.
+ * ─────────────────────────────────────────────────────────────────────
  */
 
 "use client";
 
 import { Suspense, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { RegisterForm } from "@/components/auth/RegisterForm";
 import { GoogleLoginButton } from "@/components/auth/GoogleLoginButton";
@@ -32,6 +53,14 @@ import { Container } from "@/components/layout/Container";
 function RegisterPageContent() {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
+
+  /**
+   * Dos namespaces:
+   *   - tRegister: textos propios de la página /registro
+   *   - tLogin: para reutilizar el separador "orSeparator" (compartido con /login)
+   */
+  const tRegister = useTranslations("auth.register");
+  const tLogin = useTranslations("auth.login");
 
   // Si ya hay sesión, redirigir al home
   useEffect(() => {
@@ -50,35 +79,37 @@ function RegisterPageContent() {
 
   return (
     <AuthLayout
-      eyebrow="Únete a Katalina"
-      title="Crear cuenta"
-      subtitle="Crea tu cuenta para guardar productos, hacer seguimiento de tus pedidos y acceder a ofertas exclusivas."
+      eyebrow={tRegister("pageEyebrow")}
+      title={tRegister("title")}
+      subtitle={tRegister("pageSubtitle")}
       alternateAction={{
-        prompt: "¿Ya tienes cuenta?",
-        linkText: "Inicia sesión",
+        prompt: tRegister("haveAccountPrompt"),
+        linkText: tRegister("loginLink"),
+        // Ruta siempre en español. Link de @/i18n/navigation prefija el locale.
         href: "/login",
       }}
     >
+      {/* Formulario de registro — su propia internacionalización */}
       <RegisterForm />
 
-      {/* Separador */}
+      {/* Separador (reutiliza la clave de auth.login.orSeparator) */}
       <div className="relative my-2">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-border" />
         </div>
         <div className="relative flex justify-center">
           <span className="bg-background px-3 text-xs uppercase tracking-[0.15em] text-muted-foreground">
-            o
+            {tLogin("orSeparator")}
           </span>
         </div>
       </div>
 
       {/*
-       * Botón Google con label diferente al login.
-       * "Registrarse con Google" en lugar de "Continuar con Google".
-       * Más claro para el usuario qué va a pasar.
+       * Botón Google con label específico para registro.
+       * "Registrarse con Google" / "Sign up with Google" — más claro para
+       * el usuario qué va a pasar (crea cuenta nueva, no inicia sesión).
        */}
-      <GoogleLoginButton label="Registrarse con Google" />
+      <GoogleLoginButton label={tRegister("googleButton")} />
     </AuthLayout>
   );
 }

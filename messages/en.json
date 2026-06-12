@@ -1,9 +1,8 @@
 {
   "common": {
-    "siteName": "Katalina",
+    "siteName": "MKatalina",
     "tagline": "Mexican handcrafted jewelry"
   },
-
   "nav": {
     "home": "Home",
     "shop": "Shop",
@@ -22,21 +21,154 @@
     "myAccount": "My account",
     "search": "Search"
   },
-
   "language": {
     "switchTo": "Change language",
     "currentLanguage": "Current language",
     "spanish": "Español",
     "english": "English"
   },
-
   "header": {
     "cartLabel": "Cart",
     "wishlistLabel": "Wishlist",
     "loginLabel": "Sign in",
-    "userMenuLabel": "User menu"
+    "userMenuLabel": "User menu",
+    "megaMenu": {
+      "eyebrow": "Category",
+      "imageAlt": "MKatalina {category} collection",
+      "ctaLabel": "View the full {category} collection",
+      "descriptions": {
+        "Aretes": "From minimalist designs for daily use to statement pieces for special occasions.",
+        "Collares": "Delicate chains, personalized pendants and statement necklaces to complement every outfit.",
+        "Pulseras": "Bangles, charms and woven bracelets. Combinable with each other to create a unique look.",
+        "Gargantillas": "Pieces that embrace the neck with elegance. Designs from minimalist to statement."
+      },
+      "columnTitles": {
+        "byStyle": "By style",
+        "byMaterial": "By material",
+        "byLength": "By length",
+        "byType": "By type",
+        "byOccasion": "By occasion"
+      },
+      "links": {
+        "earringsStyle": {
+          "minimalist": "Minimalist",
+          "statement": "Statement",
+          "vintage": "Vintage",
+          "ethnic": "Ethnic"
+        },
+        "earringsMaterial": {
+          "silver925": "Sterling Silver",
+          "roseGold": "Rose gold",
+          "surgicalSteel": "Surgical steel",
+          "naturalStones": "Natural stones"
+        },
+        "necklacesLength": {
+          "choker": "Choker (35-40 cm)",
+          "princess": "Princess (45-50 cm)",
+          "matinee": "Matinée (55-60 cm)",
+          "long": "Long (+70 cm)"
+        },
+        "necklacesStyle": {
+          "withPendant": "With pendant",
+          "layered": "Layered",
+          "initials": "Initials",
+          "personalized": "Personalized"
+        },
+        "braceletsType": {
+          "charms": "Charms",
+          "bangles": "Bangles",
+          "woven": "Woven",
+          "chains": "Chains"
+        },
+        "braceletsOccasion": {
+          "daily": "Daily wear",
+          "events": "Events",
+          "personalizable": "Personalizable",
+          "gifting": "For gifting"
+        },
+        "chokersMaterial": {
+          "silver925": "Sterling Silver",
+          "roseGold": "Rose gold",
+          "velvet": "Velvet",
+          "leather": "Leather"
+        },
+        "chokersStyle": {
+          "minimalist": "Minimalist",
+          "withStones": "With stones",
+          "woven": "Woven",
+          "statement": "Statement"
+        }
+      }
+    }
   },
-
+  "auth": {
+    "login": {
+      "title": "Sign in",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "forgotPassword": "Forgot your password?",
+      "submitButton": "Sign in",
+      "submitting": "Signing in...",
+      "toastSuccessTitle": "Signed in",
+      "toastSuccessDescription": "Welcome back to MKatalina",
+      "fallbackError": "Sign in failed",
+      "forgotToastTitle": "Password recovery pending",
+      "forgotToastDescription": "This feature will be available when we integrate the backend.",
+      "pageEyebrow": "Welcome back",
+      "pageSubtitle": "Access your account to view your orders, wishlist and saved data.",
+      "noAccountPrompt": "Don't have an account yet?",
+      "registerLink": "Sign up",
+      "orSeparator": "or",
+      "googleButton": "Continue with Google",
+      "googlePendingToastTitle": "Google login pending",
+      "googlePendingToastDescription": "This feature will be available when we integrate NextAuth in a later phase."
+    },
+    "register": {
+      "title": "Create account",
+      "firstNameLabel": "First name",
+      "lastNameLabel": "Last name",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "submitButton": "Create account",
+      "submitting": "Creating account...",
+      "toastSuccessTitle": "Welcome to MKatalina!",
+      "toastSuccessDescription": "Your account was created successfully",
+      "fallbackError": "Account creation failed",
+      "termsLabel": "I accept the <terms>terms and conditions</terms> and the <privacy>privacy policy</privacy>",
+      "pageEyebrow": "Join MKatalina",
+      "pageSubtitle": "Create your account to save products, track your orders and access exclusive offers.",
+      "haveAccountPrompt": "Already have an account?",
+      "loginLink": "Sign in",
+      "googleButton": "Sign up with Google"
+    },
+    "shared": {
+      "emailPlaceholder": "you@email.com",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password"
+    },
+    "errors": {
+      "loginEmptyFields": "Email and password are required",
+      "loginInvalidCredentials": "Invalid email or password",
+      "registerEmptyFields": "All fields are required",
+      "registerInvalidPassword": "Password does not meet the requirements",
+      "registerEmailTaken": "This email is already registered"
+    },
+    "validation": {
+      "firstNameRequired": "First name is required",
+      "lastNameRequired": "Last name is required",
+      "minChars": "Minimum 2 characters",
+      "emailRequired": "Email is required",
+      "emailInvalid": "Invalid email format",
+      "passwordRequired": "Password is required",
+      "passwordInvalid": "Password does not meet the requirements",
+      "acceptTermsRequired": "You must accept the terms to continue"
+    },
+    "passwordRules": {
+      "minChars": "Minimum 8 characters",
+      "uppercase": "At least one uppercase letter",
+      "number": "At least one number"
+    }
+  },
   "footer": {
     "tagline": "Handcrafted jewelry made with time in Mazatlán, Sinaloa.",
     "sections": {
@@ -57,7 +189,6 @@
     "copyright": "© {year} {siteName}. All rights reserved.",
     "madeWith": "Made with care in Mazatlán, Sinaloa"
   },
-
   "userMenu": {
     "greeting": "Hi, {firstName}",
     "myProfile": "My profile",
@@ -66,12 +197,10 @@
     "myReservations": "My reservations",
     "logout": "Sign out"
   },
-
   "legal": {
     "tableOfContents": "On this page",
     "lastUpdated": "Last updated:"
   },
-
   "accountSidebar": {
     "greeting": "Hi, {firstName}",
     "myProfile": "My profile",
@@ -85,12 +214,64 @@
       "loggedOutDescription": "We hope to see you back soon"
     }
   },
-
   "breadcrumb": {
     "home": "Home",
     "ariaLabel": "Breadcrumb"
   },
-
+  "homepage": {
+    "hero": {
+      "eyebrow": "New collection · Spring 2026",
+      "titleLine1": "Pieces that",
+      "titleLine2": "tell your",
+      "titleHighlighted": "story",
+      "description": "Mexican handcrafted jewelry designed to accompany you in the moments that matter. Each piece, handmade with the highest quality materials.",
+      "ctaPrimary": "Explore collection",
+      "ctaSecondary": "Our story",
+      "imagePlaceholderEyebrow": "Hero image",
+      "imagePlaceholderTextLine1": "Editorial photo of model",
+      "imagePlaceholderTextLine2": "wearing the new collection"
+    },
+    "categoriesGrid": {
+      "eyebrow": "Categories",
+      "title": "Explore the collection",
+      "taglines": {
+        "Aretes": "From minimalist to statement",
+        "Collares": "Pendants, chains and personalized",
+        "Pulseras": "Bangles, charms and woven",
+        "Gargantillas": "Pieces that embrace with elegance"
+      },
+      "imageAlt": "{category} by MKatalina on neutral background",
+      "imagePlaceholder": "{category} image"
+    },
+    "featuredProducts": {
+      "eyebrow": "Curated selection",
+      "title": "What's new",
+      "description": "The latest pieces from our workshop. Unique designs, in limited quantities.",
+      "ctaViewAll": "View the full collection"
+    },
+    "brandStory": {
+      "eyebrow": "Made with purpose",
+      "titleLine1": "Handmade",
+      "titleLine2": "in Mexico",
+      "paragraph1": "Each MKatalina piece is born in a small workshop in central Mexico, where expert hands combine traditional techniques with contemporary design.",
+      "paragraph2": "We work with sterling silver 925, rose gold and natural stones, choosing materials that age gracefully and have a story behind them. No mass production. No waste. Just pieces designed to last.",
+      "ctaLink": "Discover our story",
+      "imagePlaceholderEyebrow": "Workshop image",
+      "imagePlaceholderTextLine1": "Photo of artisan hands",
+      "imagePlaceholderTextLine2": "working on a piece"
+    },
+    "testimonials": {
+      "eyebrow": "The trust of our customers",
+      "title": "What they say",
+      "ratingAriaLabel": "{rating} out of 5 stars"
+    },
+    "reservationCTA": {
+      "eyebrow": "Personalized experience",
+      "title": "Looking for something unique?",
+      "description": "Book a personalized appointment and together we'll design the perfect piece for you or for that special moment.",
+      "ctaButton": "Book an appointment"
+    }
+  },
   "wishlistPage": {
     "title": "My wishlist",
     "subtitleEmpty": "You haven't saved any products yet",
@@ -102,7 +283,6 @@
       "ctaButton": "Browse products"
     }
   },
-
   "myOrders": {
     "title": "My orders",
     "subtitleWithOrders": "History of your recent purchases",
@@ -123,7 +303,6 @@
       "ctaButton": "View products"
     }
   },
-
   "profile": {
     "title": "My profile",
     "subtitle": "Manage your personal data and preferences",
@@ -158,7 +337,6 @@
       "toastPendingDescription": "This feature will be available when we integrate the backend"
     }
   },
-
   "product": {
     "badges": {
       "nuevo": "New",
@@ -245,7 +423,6 @@
       ]
     }
   },
-
   "productActions": {
     "quantityLabel": "Quantity",
     "decreaseQuantity": "Decrease quantity",
@@ -265,7 +442,6 @@
       "addedToWishlist": "Saved to your wishlist"
     }
   },
-
   "reviews": {
     "header": {
       "eyebrow": "What our customers say",
@@ -329,7 +505,6 @@
       "justNow": "a few seconds ago"
     }
   },
-
   "catalog": {
     "categoryEyebrow": "Category",
     "piecesInCollectionSingular": "{count} piece in collection",
@@ -400,7 +575,6 @@
       "title": "Related products"
     }
   },
-
   "reservation": {
     "modal": {
       "eyebrow": "Reserve item",
@@ -477,7 +651,16 @@
         "confirmYes": "Yes, cancel",
         "confirmNo": "No, keep it",
         "toastCancelledTitle": "Reservation cancelled",
-        "toastCancelledDescription": "The deposit is non-refundable"
+        "toastCancelledDescription": "The deposit is non-refundable",
+        "timeRemaining": {
+          "expired": "Expired",
+          "day": "day",
+          "days": "days",
+          "hour": "hour",
+          "hours": "hours",
+          "minute": "minute",
+          "minutes": "minutes"
+        }
       },
       "completed": {
         "totalPaid": "Total paid",
@@ -521,8 +704,32 @@
       }
     }
   },
-
   "cart": {
+    "page": {
+      "breadcrumb": "Cart",
+      "title": "Your cart",
+      "productSingular": "product",
+      "productPlural": "products",
+      "unitSingular": "unit",
+      "unitPlural": "units"
+    },
+    "summary": {
+      "title": "Order summary",
+      "subtotalLabelSimple": "Subtotal ({count} {productWord})",
+      "subtotalLabelDetailed": "Subtotal ({uniqueCount} {productWord} · {itemCount} {unitWord})",
+      "shippingLabel": "Shipping",
+      "shippingCalculated": "Calculated at checkout",
+      "totalLabel": "Total",
+      "checkoutButton": "Proceed to checkout",
+      "continueShoppingButton": "Continue shopping",
+      "paypalSecure": "Secure payment with PayPal",
+      "freeReturns": "Free returns within 30 days"
+    },
+    "empty": {
+      "title": "Your cart is empty",
+      "description": "You haven't added any products yet. Browse our collection and find something to love.",
+      "ctaButton": "View the full collection"
+    },
     "item": {
       "viewDetails": "View details of {productName}",
       "removeFromCart": "Remove {productName} from cart",
@@ -536,7 +743,6 @@
       "undo": "Undo"
     }
   },
-
   "checkout": {
     "page": {
       "breadcrumbCart": "Cart",
@@ -545,6 +751,16 @@
       "errorToast": {
         "title": "Check the marked fields",
         "description": "There are errors in the form"
+      }
+    },
+    "shippingMethods": {
+      "estandar": {
+        "label": "Standard shipping",
+        "description": "3-5 business days"
+      },
+      "express": {
+        "label": "Express shipping",
+        "description": "1-2 business days"
       }
     },
     "summary": {
@@ -607,6 +823,51 @@
         "errorRequirements": "The password doesn't meet the requirements",
         "errorGeneric": "Error creating account"
       }
+    }
+  },
+  "checkoutForm": {
+    "contactHeading": "Contact",
+    "personalDataHeading": "Personal data",
+    "addressHeading": "Shipping address",
+    "shippingMethodHeading": "Shipping method",
+    "shippingMethodAriaLabel": "Shipping method",
+    "optionalMarker": "(optional)",
+    "selectStatePlaceholder": "Select a state",
+    "fields": {
+      "emailLabel": "Email",
+      "emailPlaceholder": "you@email.com",
+      "emailHint": "We'll send your order confirmation here",
+      "firstNameLabel": "First name",
+      "lastNameLabel": "Last name",
+      "phoneLabel": "Phone",
+      "phonePlaceholder": "10 digits",
+      "phoneHint": "So the carrier can contact you",
+      "addressLabel": "Street and number",
+      "addressPlaceholder": "Av. Insurgentes Sur 1234",
+      "addressLine2Label": "Apt / Suite",
+      "addressLine2Placeholder": "Apt 304, Tower B",
+      "neighborhoodLabel": "Neighborhood",
+      "postalCodeLabel": "Postal code",
+      "postalCodePlaceholder": "00000",
+      "cityLabel": "City",
+      "stateLabel": "State",
+      "notesLabel": "Notes for the courier",
+      "notesPlaceholder": "References, special instructions..."
+    },
+    "errors": {
+      "emailRequired": "Email is required",
+      "emailInvalid": "Invalid email format",
+      "firstNameRequired": "First name is required",
+      "lastNameRequired": "Last name is required",
+      "minChars": "Minimum 2 characters",
+      "phoneRequired": "Phone is required",
+      "phoneInvalid": "Must be 10 digits",
+      "addressRequired": "Address is required",
+      "neighborhoodRequired": "Neighborhood is required",
+      "cityRequired": "City is required",
+      "stateRequired": "Select a state",
+      "postalCodeRequired": "Postal code is required",
+      "postalCodeInvalid": "Must be 5 digits"
     }
   }
 }

@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * HOME PAGE — KATALINA
+ * HOME PAGE — MKATALINA
  * ============================================================================
  *
  * La página principal de la tienda. Compone las 6 secciones que construimos
@@ -28,7 +28,7 @@
  * ║  archivo en la raíz desaparece o se vuelve un redirect.           ║
  * ╚═══════════════════════════════════════════════════════════════════╝
  *
- * Metadata SEO: el layout raíz ya define metadata default ("Katalina —
+ * Metadata SEO: el layout raíz ya define metadata default ("MKATALINA —
  * Joyería y bisutería artesanal"), así que esta página la hereda sin
  * necesidad de declararla aquí. Si quisiéramos un title específico para
  * la home (raro porque la home suele heredar el del sitio), exportaríamos

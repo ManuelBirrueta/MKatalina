@@ -1,39 +1,72 @@
 /**
  * ============================================================================
- * TESTIMONIALS — KATALINA (Sección 5 de la Home)
+ * TESTIMONIALS — KATALINA (Fase 12 Turno 3B.3: bilingüe — solo chrome)
  * ============================================================================
  *
- * Tres reseñas de clientes reales. Crea PRUEBA SOCIAL: "otras personas como
- * yo confiaron y les gustó". Es uno de los factores más influyentes en
- * decisión de compra para joyería en LATAM, donde la confianza en pagos
- * online y calidad de producto es un blocker común.
+ * Cambios respecto a la versión anterior:
+ *   - Pasa de Server a Client Component (necesario para useTranslations).
+ *   - Eyebrow + título de sección traducidos desde "homepage.testimonials.*".
+ *   - El aria-label del StarRating se construye con t() para que el screen
+ *     reader lo lea en el idioma correcto ("X de 5 estrellas" / "X out of
+ *     5 stars").
  *
- * Decisiones de diseño:
- *   1. EXACTAMENTE 3 TESTIMONIOS — número óptimo
- *   2. ESTRELLAS EN COBRE — respeta la paleta de marca
- *   3. CITAS LARGAS (3-4 LÍNEAS) — creíbles, no pegan a vista
- *   4. NOMBRE + PIEZA COMPRADA — contextualiza el testimonio
+ * Lo que NO cambia (DECISIÓN ARQUITECTURAL):
+ *   - Las 3 quotes, autores y productos referenciados SE QUEDAN HARDCODED
+ *     EN ESPAÑOL. Razón: son contenido editorial de clientes reales, no
+ *     copy de la marca. Es el mismo patrón que usamos con las reviews mock
+ *     (review.title, review.comment, review.userName NO se traducen).
+ *
+ *     Si "María L." dice "Las piezas son una joya..." en español, ese ES
+ *     su testimonio real. Traducirlo automáticamente sería:
+ *     a) inventar palabras que María nunca dijo
+ *     b) editorial inconsistente (¿por qué este testimonio sí y la reseña
+ *        de un producto no?)
+ *
+ *     Cuando integremos backend, cada testimonio podría tener:
+ *       - quote: LocalizedString (si el admin curador lo traduce manualmente)
+ *       - O quedar en el idioma original del cliente
+ *
+ * Lo que NO cambia (visual):
+ *   - Estructura: 3 cards en desktop, stack en móvil
+ *   - Fondo crema sutil (bg-muted/30) para crear "banda" visual
+ *   - Estrellas cobre (StarRating)
+ *   - Comillas tipográficas en cobre alrededor de cada quote
+ *   - Card con border, padding 8, rounded-md
+ *
+ * ─── PATRÓN PARA EL ARIA-LABEL DEL StarRating ──────────────────────────
+ *
+ * StarRating es un sub-componente local. Recibe el rating (número) y
+ * ahora también recibe el aria-label ya traducido como prop. Razón:
+ * StarRating no se renderiza arriba en jerarquía, así que no podemos
+ * llamar a useTranslations dentro de Testimonials para pasarle el
+ * aria-label ya resuelto.
+ *
+ * Alternativa rechazada: llamar useTranslations dentro de StarRating
+ * también. Funciona, pero estoy pasando t() múltiples veces por el
+ * árbol cuando ya tengo el texto resuelto arriba. Es más simple y
+ * eficiente pasar el string ya traducido.
+ * ─────────────────────────────────────────────────────────────────────
  * ============================================================================
  */
 
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Star } from "lucide-react";
 import { Container } from "@/components/layout/Container";
 import { cn } from "@/lib/utils";
 
 /**
- * Testimonial — estructura de una reseña.
+ * Testimonial — estructura de una reseña hardcoded.
  *
- * Cuando integremos backend, los testimonios vendrán de la base de datos
- * con reseñas verificadas. Por ahora hardcodeamos 3 placeholders.
+ * Las quotes/autores/productos NO son LocalizedString (decisión arquitectural).
+ * Cuando integremos backend con admin curador, puede que cada testimonio
+ * sea bilingüe si la marca decide traducirlos manualmente.
  */
 interface Testimonial {
-  /** Texto de la reseña */
   quote: string;
-  /** Nombre de la persona que dio la reseña */
   author: string;
-  /** Producto comprado, para contextualizar (ej. "Aretes Camelia") */
   product: string;
-  /** Rating de 1 a 5 estrellas */
   rating: number;
 }
 
@@ -62,26 +95,29 @@ const testimonials: Testimonial[] = [
 ];
 
 /**
- * StarRating — sub-componente para renderizar las estrellas de un testimonio.
+ * StarRating — sub-componente local para las estrellas.
  *
- * Lo separamos porque también lo usaremos en:
- *   - Página de detalle de producto (resumen de reviews)
- *   - Página individual de cada review
- *   - Filtros de "buscar por rating"
- *
- * Cuando llegue ese momento, lo extraeremos a `src/components/shop/StarRating.tsx`.
+ * Recibe el rating (número 1-5) y un aria-label ya traducido como string.
+ * Esto permite que Testimonials llame a useTranslations una sola vez y
+ * pase los textos resueltos hacia abajo.
  */
-function StarRating({ rating }: { rating: number }) {
+function StarRating({
+  rating,
+  ariaLabel,
+}: {
+  rating: number;
+  ariaLabel: string;
+}) {
   return (
-    <div className="flex gap-0.5" aria-label={`${rating} de 5 estrellas`}>
+    <div className="flex gap-0.5" aria-label={ariaLabel}>
       {[1, 2, 3, 4, 5].map((star) => (
         <Star
           key={star}
           className={cn(
             "h-4 w-4",
             star <= rating
-              ? "fill-accent text-accent" // Llena + color cobre
-              : "fill-none text-muted-foreground" // Vacía
+              ? "fill-accent text-accent"
+              : "fill-none text-muted-foreground"
           )}
           aria-hidden="true"
         />
@@ -90,32 +126,23 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
-/**
- * Testimonials — el componente principal exportado.
- *
- * IMPORTANTE: el nombre de esta función debe ser EXACTAMENTE "Testimonials"
- * (igual al nombre del archivo Testimonials.tsx). Si lees "BrandStory" o
- * cualquier otra cosa aquí, el contenido del archivo está equivocado.
- */
 export function Testimonials() {
+  const t = useTranslations("homepage.testimonials");
+
   return (
     <section className="py-24 bg-muted/30">
       <Container>
         {/* Header de sección */}
         <header className="text-center mb-12">
           <p className="text-xs uppercase tracking-[0.3em] text-accent mb-3">
-            La confianza de nuestras clientas
+            {t("eyebrow")}
           </p>
           <h2 className="font-display text-4xl md:text-5xl font-medium">
-            Lo que dicen
+            {t("title")}
           </h2>
         </header>
 
-        {/*
-         * Grid responsivo:
-         *   - móvil: 1 columna (stack vertical)
-         *   - desktop: 3 columnas
-         */}
+        {/* Grid: 1 col móvil, 3 cols desktop */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {testimonials.map((testimonial, index) => (
             <div
@@ -127,13 +154,18 @@ export function Testimonials() {
                 "flex flex-col gap-4"
               )}
             >
-              {/* Estrellas en la parte superior */}
-              <StarRating rating={testimonial.rating} />
+              {/*
+               * Estrellas: pasamos el aria-label traducido para que el
+               * screen reader lo lea correctamente en cada idioma.
+               */}
+              <StarRating
+                rating={testimonial.rating}
+                ariaLabel={t("ratingAriaLabel", { rating: testimonial.rating })}
+              />
 
               {/*
-               * Cita del testimonio con comillas tipográficas en cobre.
-               * Detalle editorial que distingue una reseña real de un
-               * párrafo cualquiera.
+               * Quote con comillas tipográficas en cobre.
+               * El texto se queda en español (decisión arquitectural).
                */}
               <blockquote className="text-base text-foreground leading-relaxed flex-1">
                 <span className="text-accent text-2xl font-display leading-none mr-1">
@@ -145,7 +177,7 @@ export function Testimonials() {
                 </span>
               </blockquote>
 
-              {/* Footer del testimonio: nombre + producto comprado */}
+              {/* Footer: nombre del autor + producto comprado */}
               <footer className="pt-4 border-t border-border">
                 <cite className="font-display text-base not-italic text-foreground block">
                   {testimonial.author}

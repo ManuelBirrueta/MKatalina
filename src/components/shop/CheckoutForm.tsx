@@ -1,54 +1,88 @@
 /**
  * ============================================================================
- * CHECKOUT FORM — KATALINA
+ * CHECKOUT FORM — KATALINA (Fase 12 Turno 3B.3: bilingüe completo)
  * ============================================================================
  *
- * Formulario completo del checkout. Contiene tres secciones:
- *   1. Contacto (email)
- *   2. Datos personales (nombre, apellido, teléfono)
- *   3. Dirección de envío (calle, colonia, ciudad, estado, CP, notas)
+ * Cambios respecto a la versión anterior:
  *
- * Plus: selector de método de envío al final.
+ *   1) validateField ahora recibe `t` como 3er parámetro:
+ *      `validateField(name, value, t)`
+ *      Los mensajes de error se resuelven con `t("checkoutForm.errors.X")`.
+ *      El padre (checkout/page.tsx) ahora debe pasarle `t` cuando llame
+ *      a esta función desde fuera (handleFieldBlur, validateAll).
  *
- * Estado del formulario:
- *   El estado vive en el COMPONENTE PADRE (la página /checkout) porque
- *   ese padre también necesita acceso al estado para:
- *     - Pasar el método de envío al CheckoutSummary (que calcula totales)
- *     - Validar todo al hacer clic en "Pagar"
- *     - Construir el objeto Order al simular el pago exitoso
+ *   2) SHIPPING_METHODS ya no se importa de @/types/checkout con labels
+ *      hardcoded. Ahora usamos `getShippingMethodsResolved(t)` que devuelve
+ *      los métodos con label/description ya traducidos al locale activo.
  *
- *   Este componente recibe `formData`, `errors`, `shippingMethod` como props,
- *   y callbacks (`onChange`, `onBlur`, `onShippingMethodChange`) para
- *   actualizar el estado en el padre. Patrón "lifted state".
+ *   3) Todos los textos hardcoded en español traducidos vía useTranslations:
+ *      - Headers de las 4 secciones
+ *      - Labels de los 10+ campos
+ *      - Placeholders, hints, marcadores (opcional)
+ *      - Texto del dropdown de estados
  *
- * Validación:
- *   La función `validateField` se exporta para que el padre la pueda usar
- *   al hacer submit final. Aquí dentro la llamamos en cada `onBlur` para
- *   feedback inmediato cuando el usuario sale de un campo.
+ *   4) MEXICAN_STATES se mantiene en español (nombres propios oficiales)
  *
- * Diseño:
- *   - Campos en grid de 2 columnas en desktop donde aplica (nombre+apellido,
- *     ciudad+estado, CP+notas)
- *   - Labels arriba de cada input, no flotantes (mejor accesibilidad)
- *   - Error message rojo debajo del campo con borde rojo en el input
- *   - Campos requeridos NO marcados con asterisco (cada campo se valida)
+ * Lo que NO cambia:
+ *   - Estructura visual del form (grid, espaciados, secciones)
+ *   - Lógica de validación (sigue siendo a través de validateField)
+ *   - autoComplete tokens (siguen siendo estándar de browsers)
+ *   - Estado lifted en el padre (formData, errors viven en page.tsx)
+ *
+ * ─── ¿POR QUÉ validateField RECIBE t COMO PARÁMETRO? ───────────────────
+ *
+ * validateField NO es un hook React (es una función pura). No podemos
+ * meter useTranslations dentro porque eso solo funciona en componentes
+ * o en otros hooks.
+ *
+ * Opciones que consideré:
+ *   A) ✅ Recibir `t` como parámetro → SIMPLE, sin refactor mayor
+ *   B) Devolver códigos de error y traducir afuera → más limpio pero
+ *      requiere cambio en el padre y en formData[errors]
+ *   C) Convertir validateField en un hook (useFieldValidator) → no
+ *      compatible con uso de validateField fuera del componente
+ *
+ * Elegí Opción A porque es la de menor disrupción y sigue manteniendo
+ * UNA fuente de verdad para las reglas de validación.
+ *
+ * ─── COMPATIBILIDAD ──────────────────────────────────────────────────
+ *
+ * Cualquier código que llame `validateField(field, value)` SIN pasar `t`
+ * recibirá error de TypeScript (parámetro `t` requerido). Esto es
+ * intencional — fuerza al caller a actualizar para tener mensajes
+ * traducidos.
+ *
+ * Si por alguna razón quisieras un fallback "sin traducir", podrías
+ * hacer `t` opcional y usar mensajes hardcoded en español como default.
+ * Pero eso oculta el bug, mejor que TypeScript te avise.
  * ============================================================================
  */
 
 "use client";
 
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/format";
 import {
-  SHIPPING_METHODS,
+  getShippingMethodsResolved,
   type CheckoutFormData,
   type FormErrors,
   type ShippingMethodId,
 } from "@/types/checkout";
 
 /**
+ * Type helper para la función de traducción. Coincide con el patrón usado
+ * en types/checkout.ts. La firma es laxa porque next-intl exporta tipos
+ * complejos con genéricos que no necesitamos repetir aquí.
+ */
+type Translator = (key: string) => string;
+
+/**
  * Estados mexicanos para el selector. Es un array fijo — México tiene
  * 32 entidades federativas y el catálogo no cambia.
+ *
+ * NO se traducen porque son nombres propios oficiales (incluso en /en/
+ * decimos "Estado de México", "Ciudad de México", "Nuevo León"...).
  *
  * Sin tildes en algunos casos porque así viene en los catálogos oficiales
  * del SAT y de paqueterías. Es mejor mantener consistencia con esos
@@ -92,77 +126,79 @@ const MEXICAN_STATES = [
 /**
  * validateField — valida un único campo y devuelve mensaje de error si aplica.
  *
- * Lo exportamos para que la página padre pueda usarlo al validar todo el
- * formulario antes del submit final. Mantener UNA fuente de verdad para
- * las reglas de validación evita inconsistencias entre validación inline
- * y validación final.
+ * AHORA recibe `t` como 3er parámetro para traducir los mensajes de error.
  *
- * Reglas por campo:
- *   - email: requerido + formato válido (regex simple, no perfecto pero
- *     suficiente para detectar errores de tipeo obvios)
+ * `t` debe estar bound al namespace "checkoutForm" en el caller:
+ *   const t = useTranslations("checkoutForm");
+ *   validateField("email", "abc", t);
+ *
+ * Internamente usamos t("errors.X") porque ese es el sub-namespace.
+ *
+ * Reglas por campo (mismas que antes):
+ *   - email: requerido + formato válido (regex simple)
  *   - firstName, lastName: requeridos, mínimo 2 chars
- *   - phone: requerido, exactamente 10 dígitos numéricos (formato mexicano)
+ *   - phone: requerido, exactamente 10 dígitos numéricos (formato MX)
  *   - address, neighborhood, city, state, postalCode: requeridos
  *   - postalCode: 5 dígitos exactos
  *   - addressLine2 y notes: opcionales, no validamos
  *
- * Devuelve string (mensaje de error) o undefined (campo válido).
+ * Devuelve string (mensaje traducido) o undefined (campo válido).
  */
 export function validateField(
   name: keyof CheckoutFormData,
-  value: string
+  value: string,
+  t: Translator
 ): string | undefined {
   // Trim para que espacios en blanco no engañen al validador
   const trimmed = value.trim();
 
   switch (name) {
     case "email": {
-      if (!trimmed) return "El email es obligatorio";
-      // Regex simple: algo@algo.algo. No es perfecto pero detecta errores
-      // de tipeo obvios sin ser restrictivo.
+      if (!trimmed) return t("errors.emailRequired");
+      // Regex simple: algo@algo.algo. Detecta errores obvios sin ser restrictivo.
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(trimmed)) return "Formato de email inválido";
+      if (!emailRegex.test(trimmed)) return t("errors.emailInvalid");
       return undefined;
     }
 
     case "firstName":
-      if (!trimmed) return "El nombre es obligatorio";
-      if (trimmed.length < 2) return "Mínimo 2 caracteres";
+      if (!trimmed) return t("errors.firstNameRequired");
+      if (trimmed.length < 2) return t("errors.minChars");
       return undefined;
 
     case "lastName":
-      if (!trimmed) return "El apellido es obligatorio";
-      if (trimmed.length < 2) return "Mínimo 2 caracteres";
+      if (!trimmed) return t("errors.lastNameRequired");
+      if (trimmed.length < 2) return t("errors.minChars");
       return undefined;
 
     case "phone": {
-      if (!trimmed) return "El teléfono es obligatorio";
+      if (!trimmed) return t("errors.phoneRequired");
       // Solo dígitos, exactamente 10 (formato mexicano)
       const phoneDigits = trimmed.replace(/\D/g, "");
-      if (phoneDigits.length !== 10) return "Debe tener 10 dígitos";
+      if (phoneDigits.length !== 10) return t("errors.phoneInvalid");
       return undefined;
     }
 
     case "address":
-      if (!trimmed) return "La dirección es obligatoria";
+      if (!trimmed) return t("errors.addressRequired");
       return undefined;
 
     case "neighborhood":
-      if (!trimmed) return "La colonia es obligatoria";
+      if (!trimmed) return t("errors.neighborhoodRequired");
       return undefined;
 
     case "city":
-      if (!trimmed) return "La ciudad es obligatoria";
+      if (!trimmed) return t("errors.cityRequired");
       return undefined;
 
     case "state":
-      if (!trimmed) return "Selecciona un estado";
+      if (!trimmed) return t("errors.stateRequired");
       return undefined;
 
     case "postalCode": {
-      if (!trimmed) return "El código postal es obligatorio";
+      if (!trimmed) return t("errors.postalCodeRequired");
       const cpDigits = trimmed.replace(/\D/g, "");
-      if (cpDigits.length !== 5) return "Debe tener 5 dígitos";
+      if (cpDigits.length !== 5) return t("errors.postalCodeInvalid");
       return undefined;
     }
 
@@ -197,6 +233,29 @@ export function CheckoutForm({
   onShippingMethodChange,
 }: CheckoutFormProps) {
   /**
+   * Hook de traducciones bound al namespace "checkoutForm" para todos
+   * los textos del formulario.
+   */
+  const t = useTranslations("checkoutForm");
+
+  /**
+   * Hook separado para los métodos de envío. El sub-namespace
+   * "checkout.shippingMethods" tiene la estructura:
+   *   estandar: { label, description }
+   *   express: { label, description }
+   *
+   * Lo pasamos a getShippingMethodsResolved que itera sobre los IDs y
+   * resuelve cada label/description.
+   */
+  const tShipping = useTranslations("checkout.shippingMethods");
+
+  /**
+   * Construir el array de métodos de envío con labels traducidos.
+   * Se re-construye en cada render (es barato — 2 strings).
+   */
+  const shippingMethods = getShippingMethodsResolved(tShipping);
+
+  /**
    * Helper para clases del input — agrega borde rojo si hay error.
    * Centraliza el styling para no repetir el className enorme en cada input.
    */
@@ -222,23 +281,13 @@ export function CheckoutForm({
 
   return (
     <div className="space-y-10">
-      {/*
-       * ═══════ SECCIÓN 1: CONTACTO ═══════
-       *
-       * El email va primero porque:
-       *   1. Es el dato más rápido de escribir (baja fricción)
-       *   2. Es el más importante (lo usamos para enviar confirmación
-       *      de compra y dar seguimiento al pedido)
-       *   3. Si el usuario abandona el form, al menos tenemos su email
-       *      para enviarle un recordatorio (con consentimiento implícito
-       *      de la transacción iniciada)
-       */}
+      {/* ═══════ SECCIÓN 1: CONTACTO ═══════ */}
       <section aria-labelledby="contact-heading">
         <h2
           id="contact-heading"
           className="text-xs uppercase tracking-[0.2em] font-medium mb-4 pb-2 border-b border-border"
         >
-          Contacto
+          {t("contactHeading")}
         </h2>
 
         <div>
@@ -246,7 +295,7 @@ export function CheckoutForm({
             htmlFor="email"
             className="block text-sm font-medium mb-1.5"
           >
-            Email
+            {t("fields.emailLabel")}
           </label>
           <input
             id="email"
@@ -256,32 +305,23 @@ export function CheckoutForm({
             value={formData.email}
             onChange={(e) => onChange("email", e.target.value)}
             onBlur={() => onBlur("email")}
-            placeholder="tu@email.com"
+            placeholder={t("fields.emailPlaceholder")}
             className={inputClass("email")}
           />
           {fieldError("email")}
           <p className="text-xs text-muted-foreground mt-1">
-            Te enviaremos la confirmación de tu pedido aquí
+            {t("fields.emailHint")}
           </p>
         </div>
       </section>
 
-      {/*
-       * ═══════ SECCIÓN 2: DATOS PERSONALES ═══════
-       *
-       * Nombre + apellido en grid de 2 columnas en desktop, apilados en móvil.
-       * Teléfono en su propia fila.
-       *
-       * autoComplete con tokens estándar para que el navegador autollene
-       * desde direcciones guardadas del usuario. Esto reduce fricción
-       * dramáticamente en móvil.
-       */}
+      {/* ═══════ SECCIÓN 2: DATOS PERSONALES ═══════ */}
       <section aria-labelledby="personal-heading">
         <h2
           id="personal-heading"
           className="text-xs uppercase tracking-[0.2em] font-medium mb-4 pb-2 border-b border-border"
         >
-          Datos personales
+          {t("personalDataHeading")}
         </h2>
 
         <div className="space-y-4">
@@ -292,7 +332,7 @@ export function CheckoutForm({
                 htmlFor="firstName"
                 className="block text-sm font-medium mb-1.5"
               >
-                Nombre
+                {t("fields.firstNameLabel")}
               </label>
               <input
                 id="firstName"
@@ -311,7 +351,7 @@ export function CheckoutForm({
                 htmlFor="lastName"
                 className="block text-sm font-medium mb-1.5"
               >
-                Apellido
+                {t("fields.lastNameLabel")}
               </label>
               <input
                 id="lastName"
@@ -332,7 +372,7 @@ export function CheckoutForm({
               htmlFor="phone"
               className="block text-sm font-medium mb-1.5"
             >
-              Teléfono
+              {t("fields.phoneLabel")}
             </label>
             <input
               id="phone"
@@ -342,33 +382,24 @@ export function CheckoutForm({
               value={formData.phone}
               onChange={(e) => onChange("phone", e.target.value)}
               onBlur={() => onBlur("phone")}
-              placeholder="10 dígitos"
+              placeholder={t("fields.phonePlaceholder")}
               className={inputClass("phone")}
             />
             {fieldError("phone")}
             <p className="text-xs text-muted-foreground mt-1">
-              Para que la paquetería pueda contactarte
+              {t("fields.phoneHint")}
             </p>
           </div>
         </div>
       </section>
 
-      {/*
-       * ═══════ SECCIÓN 3: DIRECCIÓN DE ENVÍO ═══════
-       *
-       * Esta es la sección más larga. Ponemos los campos en el orden de
-       * cómo se escribe una dirección en México:
-       *   Calle → Interior → Colonia → CP → Ciudad → Estado
-       *
-       * autoComplete="shipping" en los campos para que el navegador asocie
-       * la información con direcciones guardadas previamente como "envío".
-       */}
+      {/* ═══════ SECCIÓN 3: DIRECCIÓN DE ENVÍO ═══════ */}
       <section aria-labelledby="address-heading">
         <h2
           id="address-heading"
           className="text-xs uppercase tracking-[0.2em] font-medium mb-4 pb-2 border-b border-border"
         >
-          Dirección de envío
+          {t("addressHeading")}
         </h2>
 
         <div className="space-y-4">
@@ -378,7 +409,7 @@ export function CheckoutForm({
               htmlFor="address"
               className="block text-sm font-medium mb-1.5"
             >
-              Calle y número
+              {t("fields.addressLabel")}
             </label>
             <input
               id="address"
@@ -387,7 +418,7 @@ export function CheckoutForm({
               value={formData.address}
               onChange={(e) => onChange("address", e.target.value)}
               onBlur={() => onBlur("address")}
-              placeholder="Av. Insurgentes Sur 1234"
+              placeholder={t("fields.addressPlaceholder")}
               className={inputClass("address")}
             />
             {fieldError("address")}
@@ -399,9 +430,9 @@ export function CheckoutForm({
               htmlFor="addressLine2"
               className="block text-sm font-medium mb-1.5"
             >
-              Interior / Depto{" "}
+              {t("fields.addressLine2Label")}{" "}
               <span className="text-muted-foreground font-normal">
-                (opcional)
+                {t("optionalMarker")}
               </span>
             </label>
             <input
@@ -410,7 +441,7 @@ export function CheckoutForm({
               autoComplete="shipping address-line2"
               value={formData.addressLine2}
               onChange={(e) => onChange("addressLine2", e.target.value)}
-              placeholder="Depto 304, Torre B"
+              placeholder={t("fields.addressLine2Placeholder")}
               className={inputClass("addressLine2")}
             />
           </div>
@@ -421,7 +452,7 @@ export function CheckoutForm({
               htmlFor="neighborhood"
               className="block text-sm font-medium mb-1.5"
             >
-              Colonia
+              {t("fields.neighborhoodLabel")}
             </label>
             <input
               id="neighborhood"
@@ -442,7 +473,7 @@ export function CheckoutForm({
                 htmlFor="postalCode"
                 className="block text-sm font-medium mb-1.5"
               >
-                Código postal
+                {t("fields.postalCodeLabel")}
               </label>
               <input
                 id="postalCode"
@@ -453,7 +484,7 @@ export function CheckoutForm({
                 value={formData.postalCode}
                 onChange={(e) => onChange("postalCode", e.target.value)}
                 onBlur={() => onBlur("postalCode")}
-                placeholder="00000"
+                placeholder={t("fields.postalCodePlaceholder")}
                 className={inputClass("postalCode")}
               />
               {fieldError("postalCode")}
@@ -464,7 +495,7 @@ export function CheckoutForm({
                 htmlFor="city"
                 className="block text-sm font-medium mb-1.5"
               >
-                Ciudad
+                {t("fields.cityLabel")}
               </label>
               <input
                 id="city"
@@ -485,7 +516,7 @@ export function CheckoutForm({
               htmlFor="state"
               className="block text-sm font-medium mb-1.5"
             >
-              Estado
+              {t("fields.stateLabel")}
             </label>
             <select
               id="state"
@@ -498,7 +529,7 @@ export function CheckoutForm({
                 "cursor-pointer pr-8"
               )}
             >
-              <option value="">Selecciona un estado</option>
+              <option value="">{t("selectStatePlaceholder")}</option>
               {MEXICAN_STATES.map((state) => (
                 <option key={state} value={state}>
                   {state}
@@ -514,9 +545,9 @@ export function CheckoutForm({
               htmlFor="notes"
               className="block text-sm font-medium mb-1.5"
             >
-              Notas para el repartidor{" "}
+              {t("fields.notesLabel")}{" "}
               <span className="text-muted-foreground font-normal">
-                (opcional)
+                {t("optionalMarker")}
               </span>
             </label>
             <textarea
@@ -524,7 +555,7 @@ export function CheckoutForm({
               rows={3}
               value={formData.notes}
               onChange={(e) => onChange("notes", e.target.value)}
-              placeholder="Referencias, instrucciones especiales..."
+              placeholder={t("fields.notesPlaceholder")}
               className={cn(
                 "w-full px-3 py-2",
                 "bg-background border border-input rounded-md",
@@ -536,28 +567,25 @@ export function CheckoutForm({
         </div>
       </section>
 
-      {/*
-       * ═══════ SECCIÓN 4: MÉTODO DE ENVÍO ═══════
-       *
-       * Dos opciones como tarjetas grandes con radio button visible. NO
-       * usamos dropdown porque queremos que ambas opciones sean visibles
-       * y comparables sin esfuerzo. El usuario decide entre velocidad vs precio.
-       *
-       * El radio button es un <input type="radio"> nativo (accesible) pero
-       * lo envolvemos en una <label> grande para que toda la tarjeta sea
-       * clickeable. Patrón estándar de accesibilidad: label envolviendo
-       * el input.
-       */}
+      {/* ═══════ SECCIÓN 4: MÉTODO DE ENVÍO ═══════ */}
       <section aria-labelledby="shipping-heading">
         <h2
           id="shipping-heading"
           className="text-xs uppercase tracking-[0.2em] font-medium mb-4 pb-2 border-b border-border"
         >
-          Método de envío
+          {t("shippingMethodHeading")}
         </h2>
 
-        <div className="space-y-3" role="radiogroup" aria-label="Método de envío">
-          {SHIPPING_METHODS.map((method) => {
+        <div
+          className="space-y-3"
+          role="radiogroup"
+          aria-label={t("shippingMethodAriaLabel")}
+        >
+          {/*
+           * Iterar sobre shippingMethods YA RESUELTOS.
+           * Cada method tiene id (enum), label (traducido), description (traducido), price.
+           */}
+          {shippingMethods.map((method) => {
             const isSelected = shippingMethod === method.id;
             return (
               <label
@@ -571,14 +599,6 @@ export function CheckoutForm({
                     : "border-input hover:border-border-strong"
                 )}
               >
-                {/*
-                 * Radio button nativo, posicionado a la izquierda.
-                 * Lo dejamos visible (no oculto con sr-only) porque es
-                 * un control familiar y los usuarios saben qué significa.
-                 *
-                 * accent-secondary aplica el color rosa a los radio buttons
-                 * cuando están seleccionados (en browsers que lo soportan).
-                 */}
                 <input
                   type="radio"
                   name="shipping-method"

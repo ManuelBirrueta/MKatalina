@@ -1,56 +1,49 @@
 /**
  * ============================================================================
- * USE AUTH — KATALINA (Fase 8: implementación real)
+ * USE AUTH — KATALINA (Fase 12 Turno 3B.4: errorCode bilingüe)
  * ============================================================================
  *
- * Hook que expone la API de autenticación a los componentes.
+ * Cambios respecto a la versión anterior:
+ *   - `AuthResult.error: string` cambia a `AuthResult.errorCode: string`
+ *   - El hook devuelve códigos identificables en lugar de texto traducido
+ *   - Los códigos posibles son:
+ *       login → "loginEmptyFields" | "loginInvalidCredentials"
+ *       register → "registerEmptyFields" | "registerInvalidPassword" | "registerEmailTaken"
  *
- * Cambios respecto a la versión placeholder anterior:
- *   - Ya NO usa MOCK_LOGGED_IN. Lee el estado real del auth-store.
- *   - Expone funciones login, register, logout que mutan el store.
- *   - Valida credenciales contra MOCK_USERS + usuarios registrados.
+ * Lo que NO cambia:
+ *   - Toda la lógica de validación (campos vacíos, password rules, email duplicado)
+ *   - El comportamiento de éxito (devolver { success: true })
+ *   - La integración con auth-store
+ *   - La creación del usuario nuevo en register()
  *
- * Patrón de diseño:
- *   La UI nunca conoce Zustand ni los usuarios mock. Solo usa este hook.
- *   Cuando NextAuth llegue en Fase 12, reemplazamos esta implementación:
+ * ─── POR QUÉ errorCode EN VEZ DE error ────────────────────────────────
  *
- *     import { useSession, signIn, signOut } from "next-auth/react";
+ * El hook useAuth NO debería conocer i18n. Devolver un mensaje en español
+ * acopla el hook al locale y obliga a tener una versión por idioma.
  *
- *     export function useAuth() {
- *       const { data: session, status } = useSession();
- *       return {
- *         isAuthenticated: status === "authenticated",
- *         user: session?.user ?? null,
- *         isLoading: status === "loading",
- *         login: signIn,
- *         logout: signOut,
- *         ...
- *       };
- *     }
+ * En cambio, devolver un código identificable (string estable) permite que
+ * cada componente traduzca el código al locale activo usando su propio t().
  *
- *   Todos los componentes que consumen useAuth siguen funcionando idéntico.
+ * Patrón equivalente a HTTP status codes / API error codes en backends reales.
+ * El backend devuelve { code: "INVALID_CREDENTIALS" }, no "Credenciales
+ * inválidas". El cliente traduce.
  *
- * Tipos de retorno:
- *   - `login(email, password)` devuelve `{ success, error? }`. El componente
- *     puede usar el error para mostrar mensaje al usuario.
- *   - `register(data)` devuelve `{ success, error? }`. Similar.
+ * En los componentes (LoginForm, RegisterForm) hacemos:
+ *   t(`auth.errors.${result.errorCode}`)
  *
- *   Hacemos los handlers asíncronos (devuelven Promise) aunque la
- *   implementación actual es síncrona — esto facilita la migración a
- *   NextAuth donde sí serán async.
+ * Si en el futuro queremos cambiar el wording de "Email o contraseña
+ * incorrectos" a "Credenciales no válidas", lo cambiamos SOLO en messages.json,
+ * sin tocar el hook ni los formularios.
  *
- * Detección de doble registro:
- *   Si alguien intenta registrarse con un email ya existente (sea de
- *   MOCK_USERS o de los registeredUsers), bloqueamos con error claro.
+ * ─── ELECCIÓN DE NOMBRES DE CÓDIGOS ────────────────────────────────────
  *
- * Identidad consistente:
- *   El hook devuelve `requiresAuth` para componentes que usan
- *   sesión (ej. wishlist). Es lo opuesto de isAuthenticated, pero el
- *   nombre lo hace más natural en el código que lo consume:
- *     if (auth.requiresAuth) → redirigir a login
- *     vs
- *     if (!auth.isAuthenticated) → menos legible
- * ============================================================================
+ * Prefijo por operación (login/register) para evitar colisiones y para
+ * que sea obvio de qué viene el error. Si después añadimos logout o
+ * recoverPassword, sigue el mismo patrón:
+ *   - logoutFailed
+ *   - recoverEmailNotFound
+ *   - etc.
+ * ─────────────────────────────────────────────────────────────────────
  */
 
 "use client";
@@ -65,12 +58,6 @@ import {
   type MockUserCredentials,
 } from "@/data/mock-users";
 
-/**
- * RegisterInput — campos requeridos para crear una cuenta nueva.
- *
- * NO incluye id ni createdAt porque esos se generan automáticamente al
- * momento del registro.
- */
 export interface RegisterInput {
   email: string;
   password: string;
@@ -79,131 +66,92 @@ export interface RegisterInput {
 }
 
 /**
- * Resultado de las operaciones de auth (login/register).
+ * AuthResult — resultado de las operaciones de auth.
  *
- * Devolver un objeto con `success` (boolean) y opcionalmente `error`
- * (string) en lugar de lanzar excepciones permite que los componentes
- * manejen los errores con if/else en lugar de try/catch, que es más
- * ergonómico en formularios.
+ * Cambio: `error: string` → `errorCode: string`.
+ *
+ * Los códigos posibles están documentados en cada función (login, register).
+ * El componente caller resuelve `t(\`auth.errors.${errorCode}\`)`.
  */
 export interface AuthResult {
   success: boolean;
-  error?: string;
+  /** Código del error si success === false. Resuelve a auth.errors.{errorCode} */
+  errorCode?: string;
 }
 
 interface UseAuthReturn {
-  /** True si hay sesión activa */
   isAuthenticated: boolean;
-
-  /** Inverso de isAuthenticated — más legible en chequeos de guard */
   requiresAuth: boolean;
-
-  /** Datos del usuario logueado, o null */
   user: AuthUser | null;
 
   /**
-   * Inicia sesión. Devuelve { success: true } si OK, o
-   * { success: false, error: "mensaje" } si falla.
-   *
-   * No diferenciamos entre "email no existe" y "contraseña incorrecta"
-   * en el mensaje de error — práctica de seguridad estándar para no
-   * revelar qué emails están registrados.
+   * Inicia sesión.
+   * Códigos de error posibles:
+   *   - "loginEmptyFields" → email o password vacíos
+   *   - "loginInvalidCredentials" → email o password incorrectos (genérico
+   *     por seguridad, no revela si el email existe o no)
    */
   login: (email: string, password: string) => Promise<AuthResult>;
 
   /**
-   * Registra un nuevo usuario.
-   * Valida que el email no exista ya, que la contraseña cumpla las reglas,
-   * y que todos los campos requeridos estén presentes.
-   *
-   * Si el registro es exitoso, automáticamente inicia sesión con la nueva
-   * cuenta (comportamiento esperado: tras registrarse el usuario entra
-   * al sitio logueado).
+   * Registra un nuevo usuario y lo inicia sesión.
+   * Códigos de error posibles:
+   *   - "registerEmptyFields" → algún campo obligatorio vacío
+   *   - "registerInvalidPassword" → password no cumple PASSWORD_RULES
+   *   - "registerEmailTaken" → email ya está registrado
    */
   register: (data: RegisterInput) => Promise<AuthResult>;
 
-  /** Cierra la sesión actual */
   logout: () => void;
 }
 
 export function useAuth(): UseAuthReturn {
-  // Suscripción granular al store: solo a los campos que usamos.
-  // Esto evita re-renders cuando otros campos del store cambian.
   const currentUser = useAuthStore((state) => state.currentUser);
   const registeredUsers = useAuthStore((state) => state.registeredUsers);
   const setCurrentUser = useAuthStore((state) => state.setCurrentUser);
   const addRegisteredUser = useAuthStore((state) => state.addRegisteredUser);
   const storeLogout = useAuthStore((state) => state.logout);
 
-  /**
-   * login — valida credenciales y establece sesión si son correctas.
-   *
-   * async aunque sea sync para coincidir con la firma de NextAuth y
-   * facilitar migración futura. JavaScript permite `async` sin `await`
-   * dentro — la función devuelve una Promise automáticamente.
-   */
   const login = async (
     email: string,
     password: string
   ): Promise<AuthResult> => {
-    // Validar inputs básicos
+    // Campos obligatorios
     if (!email.trim() || !password) {
-      return { success: false, error: "Email y contraseña son requeridos" };
+      return { success: false, errorCode: "loginEmptyFields" };
     }
 
-    // Validar credenciales contra base mock + registrados
+    // Validar credenciales
     const user = validateCredentials(email, password, registeredUsers);
-
     if (!user) {
-      // Mensaje genérico — no revelar si el email existe o no
-      return {
-        success: false,
-        error: "Email o contraseña incorrectos",
-      };
+      // Genérico por seguridad: no revelamos si el email existe o no
+      return { success: false, errorCode: "loginInvalidCredentials" };
     }
 
-    // Login exitoso → establecer sesión
     setCurrentUser(user);
     return { success: true };
   };
 
-  /**
-   * register — crea cuenta nueva y la inicia sesión automáticamente.
-   *
-   * Validaciones:
-   *   1. Email no vacío y con formato válido (delegado al form, aquí
-   *      asumimos que llegó válido)
-   *   2. Contraseña cumple reglas (mínimo 8, una mayúscula, un número)
-   *   3. firstName, lastName presentes (1+ char tras trim)
-   *   4. Email no existe ya en MOCK_USERS ni en registeredUsers
-   */
   const register = async (data: RegisterInput): Promise<AuthResult> => {
     const { email, password, firstName, lastName } = data;
 
     // Validación básica de presencia
     if (!email.trim() || !password || !firstName.trim() || !lastName.trim()) {
-      return { success: false, error: "Todos los campos son obligatorios" };
+      return { success: false, errorCode: "registerEmptyFields" };
     }
 
-    // Validación de contraseña según reglas
+    // Validación de contraseña según PASSWORD_RULES
     if (!isPasswordValid(password)) {
-      return {
-        success: false,
-        error: "La contraseña no cumple los requisitos",
-      };
+      return { success: false, errorCode: "registerInvalidPassword" };
     }
 
-    // Verificar email no duplicado (case-insensitive)
+    // Email no duplicado (case-insensitive)
     const existing = findUserByEmail(email, registeredUsers);
     if (existing) {
-      return {
-        success: false,
-        error: "Este email ya está registrado",
-      };
+      return { success: false, errorCode: "registerEmailTaken" };
     }
 
     // Crear usuario nuevo
-    // ID generado client-side por ahora. En Fase 12 lo asigna el backend.
     const newUser: MockUserCredentials = {
       id: `user-${Date.now().toString(36)}${Math.random()
         .toString(36)
@@ -215,10 +163,7 @@ export function useAuth(): UseAuthReturn {
       createdAt: new Date().toISOString(),
     };
 
-    // Agregar a la "base de datos" de usuarios registrados
     addRegisteredUser(newUser);
-
-    // Iniciar sesión automáticamente (sin contraseña)
     setCurrentUser(stripPassword(newUser));
 
     return { success: true };

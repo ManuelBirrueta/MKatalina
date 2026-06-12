@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * LOCALE LAYOUT — KATALINA (Fase 12 Turno 3A: + SEO bilingüe)
+ * LOCALE LAYOUT — MKATALINA (Fase 12 Turno 3A: + SEO bilingüe)
  * ============================================================================
  *
  * Cambios respecto a la versión anterior:
@@ -15,9 +15,9 @@
  *
  * Sobre alternates.languages:
  *   Esto le dice a Next.js que genere automáticamente tags como:
- *     <link rel="alternate" hreflang="es" href="https://katalina.mx/es" />
- *     <link rel="alternate" hreflang="en" href="https://katalina.mx/en" />
- *     <link rel="alternate" hreflang="x-default" href="https://katalina.mx/es" />
+ *     <link rel="alternate" hreflang="es" href="https://Mkatalina.mx/es" />
+ *     <link rel="alternate" hreflang="en" href="https://Mkatalina.mx/en" />
+ *     <link rel="alternate" hreflang="x-default" href="https://Mkatalina.mx/es" />
  *
  *   El "x-default" es el idioma fallback cuando Google no puede determinar
  *   la preferencia del usuario. Usamos español porque es nuestro default.
@@ -89,7 +89,7 @@ export async function generateMetadata({
 
   /**
    * URL canónica del locale activo.
-   * Si estamos generando metadata para /es, canonical es https://katalina.mx/es
+   * Si estamos generando metadata para /es, canonical es https://Mkatalina.mx/es
    */
   const canonicalUrl = `${SITE_URL}/${locale}`;
 
@@ -206,10 +206,10 @@ export async function generateMetadata({
      * Alternates: declara las versiones bilingues a Google.
      *
      * Next.js convierte esto en:
-     *   <link rel="canonical" href="https://katalina.mx/es" />
-     *   <link rel="alternate" hreflang="es" href="https://katalina.mx/es" />
-     *   <link rel="alternate" hreflang="en" href="https://katalina.mx/en" />
-     *   <link rel="alternate" hreflang="x-default" href="https://katalina.mx/es" />
+     *   <link rel="canonical" href="https://Mkatalina.mx/es" />
+     *   <link rel="alternate" hreflang="es" href="https://Mkatalina.mx/es" />
+     *   <link rel="alternate" hreflang="en" href="https://Mkatalina.mx/en" />
+     *   <link rel="alternate" hreflang="x-default" href="https://Mkatalina.mx/es" />
      */
     alternates: {
       canonical: canonicalUrl,
