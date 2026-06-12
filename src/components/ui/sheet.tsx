@@ -7,6 +7,45 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
 
+/**
+ * ============================================================================
+ * SHEET — KATALINA (fix: size="icon-sm" → size="icon")
+ * ============================================================================
+ *
+ * Cambio respecto a la versión anterior:
+ *   - El botón "X" de cierre del drawer ahora usa size="icon" en lugar de
+ *     size="icon-sm". La variante "icon-sm" NO existe en el tipo de
+ *     Button.tsx que tienes instalado, lo cual causaba que `next build`
+ *     fallara con el siguiente error:
+ *
+ *       Type error: Type '"icon-sm"' is not assignable to type
+ *       '"lg" | "sm" | "default" | "icon" | null | undefined'.
+ *
+ * Por qué `next dev` no lo detectaba pero `next build` sí:
+ *   - dev con turbopack hace type-check incremental y permisivo
+ *   - build siempre corre tsc completo y rechaza CUALQUIER error de tipos
+ *   - Para producción, build es obligatorio (es lo que Vercel/Netlify
+ *     corren para desplegar)
+ *
+ * Origen del bug:
+ *   Este archivo fue generado por la CLI de shadcn (npx shadcn add sheet).
+ *   Las plantillas de shadcn a veces incluyen variantes ("icon-sm") que
+ *   solo existen en versiones más recientes del component button.tsx.
+ *   Como tu button.tsx solo tiene "default" | "sm" | "lg" | "icon", hubo
+ *   desalineamiento.
+ *
+ * Por qué "icon" es la mejor sustitución:
+ *   - Es la variante diseñada específicamente para botones de solo icono
+ *     (cuadrada, padding compacto)
+ *   - Visualmente es muy similar a lo que "icon-sm" pretendía
+ *   - Para el botón X de cierre de un drawer, "icon" es la opción canónica
+ *
+ * Si en el futuro decides agregar "icon-sm" como variante real a tu
+ * button.tsx (botón aún más pequeño que "icon"), podrías revertir este
+ * cambio. Pero por ahora con "icon" es suficiente.
+ * ============================================================================
+ */
+
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />
 }
@@ -70,13 +109,17 @@ function SheetContent({
         {children}
         {showCloseButton && (
           <SheetPrimitive.Close data-slot="sheet-close" asChild>
+            {/*
+             * Botón X de cierre del drawer.
+             * size="icon" (era "icon-sm" pero esa variante no existe en
+             * nuestro button.tsx — fix de build).
+             */}
             <Button
               variant="ghost"
               className="absolute top-3 right-3"
-              size="icon-sm"
+              size="icon"
             >
-              <XIcon
-              />
+              <XIcon />
               <span className="sr-only">Close</span>
             </Button>
           </SheetPrimitive.Close>
