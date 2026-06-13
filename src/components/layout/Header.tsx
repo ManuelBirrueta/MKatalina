@@ -274,11 +274,91 @@ export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
 
+  /**
+   * Detección de scroll con HISTÉRESIS para evitar el "flickering" del header.
+   *
+   * ─── EL PROBLEMA SIN HISTÉRESIS ───────────────────────────────────────
+   *
+   * Si usas un solo umbral (ej. `scrollY > 80`), el header puede oscilar
+   * cuando el scroll queda cerca de ese umbral. Cuando isScrolled cambia
+   * de false a true, el header se acorta (py-6 → py-3) y el logo se
+   * encoge (md → sm). Esto reduce la altura del header en ~24px. Como
+   * el header es sticky, el contenido debajo "sube" visualmente.
+   *
+   * Durante la transición de 300ms, ciertos navegadores pueden disparar
+   * nuevos eventos de scroll con scrollY ligeramente diferente. Si en
+   * ese momento scrollY < 80, isScrolled vuelve a false → el header
+   * crece otra vez → otro evento de scroll → loop infinito de titubeo.
+   *
+   * ─── LA SOLUCIÓN: 2 UMBRALES (HISTÉRESIS) ─────────────────────────────
+   *
+   * En lugar de un solo umbral, usamos DOS:
+   *   - SCROLL_DOWN_THRESHOLD = 100: activar isScrolled cuando bajamos
+   *     y pasamos los 100px
+   *   - SCROLL_UP_THRESHOLD = 50: desactivar isScrolled cuando subimos
+   *     y bajamos de los 50px
+   *
+   * Entre 50 y 100, NO CAMBIA NADA. Es una "zona muerta" estable.
+   *
+   * Es el mismo principio que usan los termostatos: no encienden a 19.99°C
+   * cada vez que baja de 20°C — esperan a 19°C para encender, y se apagan
+   * a 21°C. La zona entre 19 y 21 evita ciclos cortos.
+   *
+   * ─── OPTIMIZACIÓN: requestAnimationFrame ─────────────────────────────
+   *
+   * El evento `scroll` se dispara MUCHAS veces por segundo (60-120Hz
+   * típico, más en monitores de alta frecuencia). Si cada disparo
+   * recalcula el estado, hay trabajo desperdiciado.
+   *
+   * requestAnimationFrame (rAF) sincroniza la actualización con el ciclo
+   * de render del navegador: solo se ejecuta UNA vez por frame. Con el
+   * flag `ticking`, evitamos encolar múltiples rAFs.
+   *
+   * Resultado: el handler de scroll real se ejecuta ~60 veces/segundo
+   * máximo, y solo cambia state cuando los umbrales se cruzan.
+   * ─────────────────────────────────────────────────────────────────────
+   */
   useEffect(() => {
+    const SCROLL_DOWN_THRESHOLD = 50; // Bajando: activar header compacto
+    const SCROLL_UP_THRESHOLD = 30;    // Subiendo: desactivar (volver a grande)
+
+    let ticking = false;
+
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 80);
+      // Throttle con requestAnimationFrame: solo procesar 1 vez por frame
+      if (ticking) return;
+
+      ticking = true;
+      window.requestAnimationFrame(() => {
+        const scrollY = window.scrollY;
+
+        // Histéresis: usamos el callback functional de setState para leer
+        // el valor MÁS RECIENTE de isScrolled sin necesidad de incluirlo
+        // en las dependencias del useEffect.
+        setIsScrolled((currentlyScrolled) => {
+          if (currentlyScrolled && scrollY < SCROLL_UP_THRESHOLD) {
+            // Estamos en estado scrolled Y subimos por debajo del umbral
+            // → volver a estado grande
+            return false;
+          }
+          if (!currentlyScrolled && scrollY > SCROLL_DOWN_THRESHOLD) {
+            // Estamos en estado normal Y bajamos por debajo del umbral
+            // → cambiar a estado compacto
+            return true;
+          }
+          // Zona muerta entre umbrales: no cambiar nada
+          return currentlyScrolled;
+        });
+
+        ticking = false;
+      });
     };
+
+    // Llamada inicial para configurar el estado correcto si la página
+    // se carga con scroll ya activo (ej. usuario refresca en mitad de
+    // la página).
     handleScroll();
+
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
@@ -407,6 +487,22 @@ export function Header() {
 
           {/* COLUMNA 3: Iconos de acción */}
           <div className="flex items-center gap-1 justify-self-end">
+            {/*
+             * Botón de búsqueda — OCULTO EN MOBILE (hidden sm:inline-flex).
+             *
+             * Razón: en mobile (<640px) el header tiene poco espacio
+             * horizontal. El logo "MKatalina" + ícono de carrito + búsqueda
+             * causaba que el botón de búsqueda cayera SOBRE las letras
+             * finales del logo (colisión visual).
+             *
+             * Como la búsqueda todavía es un placeholder (solo muestra un
+             * alert), ocultarla en mobile no afecta la funcionalidad real
+             * y mejora el layout. Cuando implementemos búsqueda real (Fase
+             * 13 con backend), podemos:
+             *   a) Agregar un campo de búsqueda dentro del drawer mobile
+             *   b) O quitar el "hidden sm:inline-flex" si decidimos
+             *      que el botón debe estar visible en mobile
+             */}
             <Button
               variant="ghost"
               size="icon"
@@ -414,6 +510,7 @@ export function Header() {
               onClick={() => {
                 alert("Búsqueda — pendiente de implementar");
               }}
+              className="hidden sm:inline-flex"
             >
               <Search className="h-4 w-4" />
             </Button>

@@ -1,26 +1,79 @@
 /**
  * ============================================================================
- * MOBILE NAV — KATALINA (actualizado con wishlist)
+ * MOBILE NAV — MKATALINA (bilingüe completo + selector de idioma funcional)
  * ============================================================================
  *
  * Cambios respecto a la versión anterior:
- *   - Importa el icono Heart y el hook useWishlist
- *   - Agrega un link "Mi wishlist" en el footer del drawer, debajo de
- *     "Iniciar sesión"
  *
- * Por qué la wishlist se muestra en el FOOTER del drawer y no junto a las
- * categorías:
+ *   1) IMPORT DE Link cambia de "next/link" a "@/i18n/navigation"
+ *      Razón: los links del drawer mobile no preservaban el locale al
+ *      navegar. Ahora cualquier <Link href="/aretes"> automáticamente
+ *      respeta /es/aretes o /en/aretes según el idioma activo.
+ *
+ *   2) BILINGÜE COMPLETO con useTranslations
+ *      Todos los strings hardcoded ahora vienen de messages.json:
+ *        - "Abrir menú de navegación" → nav.openMenu
+ *        - "Menú de navegación principal..." → header.mobileNav.menuDescription
+ *        - "Ver toda la colección →" → header.mobileNav.seeFullCollection
+ *        - "Iniciar sesión" → header.loginLabel
+ *        - "Mi wishlist" → header.wishlistLabel
+ *        - "Selector de idioma — pendiente..." → eliminado, reemplazado
+ *          por implementación funcional
+ *
+ *   3) SELECTOR DE IDIOMA FUNCIONAL (no más alert placeholder)
+ *      Reemplazado el botón con alert() por un toggle "ES | EN" donde:
+ *        - El idioma activo aparece en color cobre (text-accent)
+ *        - El otro idioma es clickeable con hover en color cobre
+ *        - Al hacer click se llama a router.replace(pathname, { locale })
+ *          que es exactamente el mismo mecanismo del LanguageSwitcher desktop
+ *        - El drawer se cierra automáticamente al cambiar (handleLinkClick)
+ *
+ * Por qué NO reutilizamos el componente <LanguageSwitcher /> desktop:
+ *   El LanguageSwitcher desktop es un DROPDOWN (botón compacto + lista que
+ *   aparece debajo al hacer click). En mobile dentro del drawer, abrir otro
+ *   dropdown sobre el drawer es UX confusa. Mejor implementar el patrón
+ *   "toggle inline" que el usuario pidió, reutilizando los hooks (useRouter,
+ *   usePathname, useLocale) pero NO el JSX del LanguageSwitcher.
+ *
+ * Por qué el wishlist se muestra en el FOOTER del drawer:
  *   - Las categorías son "espacios de exploración" (descubrir productos)
  *   - La wishlist es "espacio personal" (productos ya descubiertos)
- *   - Esa separación visual entre "explorar" y "lo mío" coincide con la
- *     forma en que el usuario piensa al navegar la tienda
+ *   - La separación visual refuerza la distinción entre explorar y "lo mío"
+ *
+ * ─── ARQUITECTURA DEL SELECTOR DE IDIOMA ───────────────────────────────
+ *
+ * El selector usa los mismos hooks que el LanguageSwitcher desktop:
+ *
+ *   - useLocale(): devuelve el locale activo ("es" o "en") para saber
+ *     cuál subrayar y a cuál NO navegar (no-op si haces click en el activo).
+ *
+ *   - useRouter() de "@/i18n/navigation": devuelve un router que sabe
+ *     manipular locales. router.replace(pathname, { locale }) hace 3 cosas:
+ *       a) Convierte el pathname actual al equivalente del nuevo locale
+ *          (en nuestro caso, mismas URLs ES/EN porque pathnames=undefined
+ *          en routing.ts, decisión arquitectural ya tomada)
+ *       b) Guarda cookie NEXT_LOCALE para futuras visitas
+ *       c) Redirige al usuario sin reload completo de página
+ *
+ *   - usePathname() de "@/i18n/navigation": devuelve el pathname canónico
+ *     sin el prefijo de locale. Ej. si estás en /es/aretes, devuelve "/aretes".
+ *     Esto se le pasa a router.replace junto con { locale: "en" } para
+ *     navegar a "/en/aretes".
+ *
+ *   - useTransition(): permite saber si el cambio está en progreso
+ *     (router.replace tarda algunos ms). Durante ese tiempo deshabilitamos
+ *     los botones para evitar dobles clicks.
+ * ─────────────────────────────────────────────────────────────────────
  * ============================================================================
  */
 
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useState, useTransition } from "react";
+import { useLocale, useTranslations } from "next-intl";
+// IMPORTANTE: Link, useRouter, usePathname desde @/i18n/navigation
+// (no de next/link ni next/navigation) para que respeten el locale activo.
+import { Link, useRouter, usePathname } from "@/i18n/navigation";
 import { Menu, ChevronDown, User, Globe, Heart } from "lucide-react";
 import {
   Sheet,
@@ -34,6 +87,7 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/layout/Logo";
 import { useWishlist } from "@/hooks/use-wishlist";
 import { cn } from "@/lib/utils";
+import { routing } from "@/i18n/routing";
 import type { MegaMenuContent } from "@/components/layout/CategoryMegaMenu";
 
 interface MobileNavProps {
@@ -45,13 +99,26 @@ interface MobileNavProps {
 }
 
 export function MobileNav({ categories }: MobileNavProps) {
+  /**
+   * 3 namespaces de traducciones:
+   *   - tNav: para "Abrir menú", links navegación, etc.
+   *   - tHeader: para "Iniciar sesión", "Lista de deseos", descripciones del drawer
+   *   - tLanguage: para "Cambiar idioma" (aria-label del selector)
+   */
+  const tNav = useTranslations("nav");
+  const tHeader = useTranslations("header");
+  const tLanguage = useTranslations("language");
+
+  // Hooks de i18n para el selector de idioma funcional
+  const locale = useLocale();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [isPending, startTransition] = useTransition();
+
   const [open, setOpen] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
-  /**
-   * Datos de la wishlist para mostrar el contador en el link móvil.
-   * Como en desktop, si no hay sesión el link redirige a /login.
-   */
+  // Datos de wishlist (sin cambios)
   const { itemCount: wishlistCount, requiresAuth: wishlistRequiresAuth } =
     useWishlist();
 
@@ -59,15 +126,42 @@ export function MobileNav({ categories }: MobileNavProps) {
     ? "/login?redirect=/wishlist"
     : "/wishlist";
 
-  // Mostrar el contador solo si hay sesión y hay items guardados
   const showWishlistCount = !wishlistRequiresAuth && wishlistCount > 0;
 
+  /**
+   * handleLinkClick — cierra el drawer cuando el usuario hace click
+   * en cualquier link. Mejora UX: el drawer se cierra automáticamente
+   * después de navegar.
+   */
   const handleLinkClick = () => {
     setOpen(false);
   };
 
   const toggleCategory = (label: string) => {
     setExpandedCategory((current) => (current === label ? null : label));
+  };
+
+  /**
+   * handleLanguageChange — lógica del selector de idioma.
+   *
+   * Si el usuario hace click en el mismo idioma activo, no hace nada
+   * (early return). Si elige el otro idioma:
+   *   1. startTransition() marca el cambio como pending (deshabilita botones)
+   *   2. router.replace(pathname, { locale: newLocale }) navega al
+   *      equivalente en el nuevo idioma manteniendo el path actual
+   *   3. setOpen(false) cierra el drawer (UX: el usuario ve la página
+   *      principal renderizada en el nuevo idioma)
+   */
+  const handleLanguageChange = (newLocale: string) => {
+    if (newLocale === locale) return; // No-op si ya es el idioma activo
+
+    startTransition(() => {
+      // pathname es el path canónico sin prefijo de locale (ej. "/aretes").
+      // router.replace lo combina con el nuevo locale → "/en/aretes" o "/es/aretes"
+      router.replace(pathname, { locale: newLocale });
+    });
+
+    setOpen(false);
   };
 
   return (
@@ -77,7 +171,7 @@ export function MobileNav({ categories }: MobileNavProps) {
           variant="ghost"
           size="icon"
           className="md:hidden"
-          aria-label="Abrir menú de navegación"
+          aria-label={tNav("openMenu")}
         >
           <Menu className="h-5 w-5" />
         </Button>
@@ -94,7 +188,7 @@ export function MobileNav({ categories }: MobileNavProps) {
             </Link>
           </SheetTitle>
           <SheetDescription className="sr-only">
-            Menú de navegación principal con categorías de productos
+            {tHeader("mobileNav.menuDescription")}
           </SheetDescription>
         </SheetHeader>
 
@@ -142,7 +236,7 @@ export function MobileNav({ categories }: MobileNavProps) {
                       "font-medium"
                     )}
                   >
-                    Ver toda la colección →
+                    {tHeader("mobileNav.seeFullCollection")}
                   </Link>
 
                   {category.content.columns.map((column) => (
@@ -173,14 +267,6 @@ export function MobileNav({ categories }: MobileNavProps) {
 
         {/*
          * ─── FOOTER DEL DRAWER: links personales ───
-         *
-         * Aquí van los enlaces a la zona "mía" del usuario:
-         *   - Iniciar sesión / Mi cuenta
-         *   - Mi wishlist (NUEVO)
-         *   - Selector de idioma
-         *
-         * Separados visualmente del menú principal con un border-top y
-         * más espaciado, refuerzan la idea de "esto es tuyo, no es navegación".
          */}
         <div className="p-6 space-y-3 border-t border-border">
           {/* Iniciar sesión / Mi cuenta */}
@@ -190,33 +276,22 @@ export function MobileNav({ categories }: MobileNavProps) {
             className="flex items-center gap-3 text-sm hover:text-accent transition-colors"
           >
             <User className="h-4 w-4" />
-            <span>Iniciar sesión</span>
+            <span>{tHeader("loginLabel")}</span>
           </Link>
 
-          {/*
-           * Mi wishlist — NUEVO
-           *
-           * Diseño:
-           *   - Mismo formato que "Iniciar sesión" (icono + label) para
-           *     consistencia visual
-           *   - El contador aparece a la derecha con el mismo estilo del
-           *     badge desktop (rosa polvo, redondeado)
-           *   - flex-1 + ml-auto en el badge: el label se queda a la izq.
-           *     y el badge se va a la der., el espacio entre se distribuye solo
-           */}
+          {/* Mi wishlist con badge */}
           <Link
             href={wishlistHref}
             onClick={handleLinkClick}
             className="flex items-center gap-3 text-sm hover:text-accent transition-colors"
           >
             <Heart className="h-4 w-4" />
-            <span>Mi wishlist</span>
+            <span>{tHeader("wishlistLabel")}</span>
 
-            {/* Badge con el contador, solo si hay items y hay sesión */}
             {showWishlistCount && (
               <span
                 className={cn(
-                  "ml-auto", // Empuja el badge al lado derecho del link
+                  "ml-auto",
                   "h-5 min-w-[20px] px-1.5 rounded-full",
                   "bg-secondary text-secondary-foreground",
                   "text-[10px] font-medium leading-none",
@@ -228,16 +303,79 @@ export function MobileNav({ categories }: MobileNavProps) {
             )}
           </Link>
 
-          {/* Selector de idioma — placeholder, conexión real en Fase 4 */}
-          <button
-            className="flex items-center gap-3 text-sm hover:text-accent transition-colors"
-            onClick={() => {
-              alert("Selector de idioma — pendiente de integrar con next-intl");
-            }}
+          {/*
+           * ─── SELECTOR DE IDIOMA FUNCIONAL ───
+           *
+           * Estructura visual:
+           *   🌐  ES | EN
+           *      ─        (activo subrayado en cobre)
+           *
+           * - Icono Globe a la izquierda (consistente con desktop)
+           * - Toggle "ES | EN" donde:
+           *   * El idioma activo: color cobre (text-accent) + font-medium
+           *   * El idioma inactivo: color foreground normal + hover cobre
+           * - Aria-label descriptivo para screen readers
+           * - Botones deshabilitados durante la transición (isPending)
+           *
+           * Implementación: cada idioma es un <button> separado dentro
+           * de un div flex. Esto permite estilos independientes y
+           * facilita la accesibilidad (cada idioma es su propio elemento
+           * focusable).
+           */}
+          <div
+            className="flex items-center gap-3 text-sm"
+            aria-label={tLanguage("switchTo")}
           >
-            <Globe className="h-4 w-4" />
-            <span>ES / EN</span>
-          </button>
+            <Globe className="h-4 w-4 text-foreground" aria-hidden="true" />
+
+            {/*
+             * Lista de idiomas con separador visual " | " entre ellos.
+             * Generamos los botones iterando sobre routing.locales
+             * para que si en el futuro agregas más idiomas (pt, fr),
+             * el código no necesite cambios.
+             */}
+            <div className="flex items-center gap-2">
+              {routing.locales.map((option, index) => {
+                const isActive = option === locale;
+                return (
+                  <div key={option} className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleLanguageChange(option)}
+                      disabled={isPending || isActive}
+                      aria-current={isActive ? "true" : undefined}
+                      className={cn(
+                        "uppercase tracking-wider font-medium",
+                        "transition-colors",
+                        isActive
+                          ? // Idioma activo: cobre, no clickeable (cursor default)
+                            "text-accent cursor-default"
+                          : // Idioma inactivo: foreground, clickeable con hover cobre
+                            "text-foreground hover:text-accent cursor-pointer",
+                        // Estado deshabilitado durante transición
+                        isPending && "opacity-50"
+                      )}
+                    >
+                      {option}
+                    </button>
+
+                    {/*
+                     * Separador " | " entre idiomas (no después del último).
+                     * Como solo hay 2 idiomas (es, en), aparece UN separador.
+                     * Si agregaras más, el patrón sigue funcionando.
+                     */}
+                    {index < routing.locales.length - 1 && (
+                      <span
+                        className="text-muted-foreground"
+                        aria-hidden="true"
+                      >
+                        |
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </SheetContent>
     </Sheet>

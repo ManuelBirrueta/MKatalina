@@ -99,6 +99,10 @@
           "statement": "Statement"
         }
       }
+    },
+    "mobileNav": {
+      "menuDescription": "Menú de navegación principal con categorías de productos",
+      "seeFullCollection": "Ver toda la colección →"
     }
   },
   "auth": {

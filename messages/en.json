@@ -99,6 +99,10 @@
           "statement": "Statement"
         }
       }
+    },
+    "mobileNav": {
+      "menuDescription": "Main navigation menu with product categories",
+      "seeFullCollection": "See full collection →"
     }
   },
   "auth": {
