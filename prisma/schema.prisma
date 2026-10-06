@@ -1,0 +1,354 @@
+// ============================================================================
+//  MKatalina · Esquema de base de datos (Prisma) · Fase 13 · Etapa 1
+// ============================================================================
+//
+//  QUÉ ES ESTE ARCHIVO
+//  -------------------
+//  Este es el "plano" de nuestra base de datos. Prisma lee este archivo y a
+//  partir de él (1) genera el cliente tipado de TypeScript que usaremos para
+//  consultar la BD y (2) genera las migraciones SQL que crean/modifican las
+//  tablas reales en Postgres.
+//
+//  DECISIÓN DE ARQUITECTURA CLAVE
+//  ------------------------------
+//  Los 24 PRODUCTOS SIGUEN EN CÓDIGO (en src/data/products.ts). La base de
+//  datos NO tiene tabla de productos. En su lugar, cada dato dinámico que
+//  necesita "apuntar" a un producto guarda un `productSlug` (un texto, ej.
+//  "aretes-luna-plata"). Así el catálogo lo controla el código y la BD solo
+//  guarda lo que cambia: usuarios, pedidos, apartados, reseñas, etc.
+//
+//  PRINCIPIO DE "SNAPSHOT INMUTABLE"
+//  ---------------------------------
+//  Cuando alguien compra o aparta, guardamos una COPIA CONGELADA del nombre y
+//  precio de ese momento (campos `*Snapshot`). Si mañana cambias el nombre o
+//  el precio del producto en el código, las facturas viejas NO cambian. Esto
+//  es un requisito de negocio (facturación) que tú definiste.
+//
+//  CONEXIÓN A SUPABASE (dos URLs, a propósito)
+//  -------------------------------------------
+//  Supabase nos da un Postgres. Prisma necesita DOS cadenas de conexión:
+//    · url       -> conexión "pooled" (puerto 6543). La usan las consultas
+//                   normales en producción serverless (muchas conexiones
+//                   cortas). Requiere ?pgbouncer=true al final.
+//    · directUrl -> conexión "directa" (puerto 5432). Prisma la usa SOLO para
+//                   correr migraciones. Si falta, las migraciones fallan.
+//  Ambas viven en .env.local (nunca se suben a Git).
+//
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // pooled (6543) para consultas
+  directUrl = env("DIRECT_URL")   // directa (5432) para migraciones
+}
+
+// ============================================================================
+//  ENUMS  (valores en español, como acordamos)
+// ----------------------------------------------------------------------------
+//  Nota: los NOMBRES de los tipos van en inglés (OrderStatus...) para coincidir
+//  con los nombres de los modelos que definiste en tu documento; los VALORES
+//  van en español porque a menudo se muestran en el panel de administración.
+//  Los identificadores de enum no permiten acentos, por eso "ESTANDAR".
+// ============================================================================
+
+/// Estado del ciclo de vida de un pedido normal.
+enum OrderStatus {
+  PENDIENTE // creado pero el pago aún no se confirma
+  PAGADO // PayPal confirmó el pago
+  PROCESANDO // se está preparando el envío
+  ENVIADO // ya salió a reparto / paquetería
+  ENTREGADO // el cliente lo recibió
+  CANCELADO // anulado
+}
+
+/// Estado del ciclo de vida de un apartado (layaway).
+enum ReservationStatus {
+  ACTIVO // anticipo pagado, dentro de los 5 días
+  COMPLETADO // se liquidó el monto restante
+  EXPIRADO // pasaron los 5 días sin liquidar
+  CANCELADO // anulado manualmente
+}
+
+
+// ============================================================================
+//  MODELO: Profile
+// ----------------------------------------------------------------------------
+//  Perfil de la aplicación. Tiene relación 1-a-1 con el usuario de
+//  Supabase Auth: COMPARTEN EL MISMO id (un UUID).
+//
+//  ¿Por qué separar Profile de "el usuario"? Porque Supabase guarda la parte
+//  sensible de la cuenta (contraseña, sesión, email verificado) en su propio
+//  esquema `auth`, que NO tocamos con Prisma. Aquí guardamos solo los datos
+//  de negocio del usuario. En la Etapa 2, al registrarse alguien, crearemos
+//  automáticamente su fila Profile con el mismo id que le asignó Supabase.
+//
+//  Por eso NO ponemos una llave foránea a auth.users: viven en esquemas
+//  distintos y lo mantenemos simple. La consistencia la garantiza el código
+//  de registro.
+// ============================================================================
+model Profile {
+  id    String  @id @db.Uuid // == id del usuario en Supabase Auth
+  email String  @unique
+  firstName String?
+  lastName  String?
+  phone     String?
+  locale    String  @default("es") // idioma preferido: "es" | "en"
+  role String @default("customer") // "customer" | "admin"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones inversas (un perfil tiene muchos de cada uno de estos).
+  addresses     Address[]
+  orders        Order[]
+  reservations  Reservation[]
+  reviews       Review[]
+  wishlistItems WishlistItem[]
+  cartItems     CartItem[]
+
+  @@map("profiles")
+}
+
+// ============================================================================
+//  MODELO: Address
+// ----------------------------------------------------------------------------
+//  Direcciones GUARDADAS de un usuario con cuenta (su "libreta de
+//  direcciones"). OJO: la dirección concreta de un pedido NO se lee de aquí;
+//  se COPIA (snapshot) dentro del propio Order al momento de comprar. Así, si
+//  el usuario luego edita o borra esta dirección, los pedidos viejos no se
+//  alteran. Esta tabla existe solo para autocompletar el checkout.
+//  Los invitados no usan esta tabla (escriben su dirección directo en el pedido).
+// ============================================================================
+model Address {
+  id        String  @id @default(uuid())
+  profileId String  @db.Uuid
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  recipientName String // a nombre de quién llega
+  phone         String
+  street        String // calle
+  extNumber     String // número exterior
+  intNumber     String? // número interior (opcional)
+  colonia       String // colonia / barrio (término MX)
+  city          String
+  state         String
+  postalCode    String
+  country       String  @default("MX")
+  isDefault     Boolean @default(false) // dirección predeterminada del usuario
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([profileId])
+  @@map("addresses")
+}
+
+// ============================================================================
+//  MODELO: Order  (Pedido)
+// ----------------------------------------------------------------------------
+//  Un pedido de compra directa. El `id` NO es un UUID: es tu identificador de
+//  negocio con prefijo "MKTL-" (ej. "MKTL-000042"), que se genera EN EL
+//  SERVIDOR (Etapa 4). Por eso este campo no tiene @default: siempre lo
+//  fijamos nosotros al crear el pedido.
+//
+//  CHECKOUT COMO INVITADO: `profileId` es OPCIONAL (String?). Un pedido puede
+//  existir sin cuenta. Por eso guardamos también email/teléfono de contacto
+//  directamente en el pedido: es la única forma de contactar a un invitado.
+//
+//  DIRECCIÓN Y MONTOS "CONGELADOS": los campos de envío y los importes se
+//  copian aquí al comprar (snapshot). La factura queda fija para siempre.
+// ============================================================================
+model Order {
+  id String @id // "MKTL-XXXXXX", generado en el cliente (por ahora)
+
+  profileId String?  @db.Uuid // null = compra como invitado
+  profile   Profile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+
+  // Contacto
+  email String
+  phone String
+
+  // Snapshot de datos personales + dirección (los campos del formulario)
+  firstName    String
+  lastName     String
+  address      String  // calle y número
+  addressLine2 String? // interior / depto (opcional)
+  neighborhood String  // colonia
+  city         String
+  state        String
+  postalCode   String
+  country      String  @default("MX")
+  notes        String? // notas para el repartidor
+
+  // Envío (snapshot)
+  shippingMethodId String // "estandar" | "express"
+  shippingLabel    String // etiqueta ya resuelta al idioma de compra
+  shippingCost     Int    // pesos enteros
+
+  // Montos (pesos enteros)
+  subtotal Int
+  total    Int
+  currency String @default("MXN")
+
+  // Estado y metadatos
+  status        OrderStatus @default(PAGADO) // pago simulado por ahora
+  locale        String      @default("es")
+  paypalOrderId String? // para el pago real (paso 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items OrderItem[]
+
+  @@index([profileId])
+  @@index([status])
+  @@map("orders")
+}
+
+// ============================================================================
+//  MODELO: OrderItem  (Renglón de pedido)
+// ----------------------------------------------------------------------------
+//  Cada producto dentro de un pedido. Como los productos viven en código,
+//  guardamos su `productSlug` para saber cuál era, MÁS un `nameSnapshot`: el
+//  nombre YA RESUELTO al idioma del pedido en ese momento. Si el catálogo
+//  cambia después, este renglón conserva el nombre y precio originales.
+// ============================================================================
+model OrderItem {
+  id      String @id @default(uuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productSlug      String
+  nameSnapshot     String  // nombre congelado, ya traducido al idioma del pedido
+  unitPrice        Int     // precio unitario congelado (pesos enteros)
+  quantity         Int
+  lineTotal        Int     // unitPrice * quantity (congelado)
+  imageSnapshot    String? // imagen al momento (para la confirmación)
+  categorySnapshot String? // categoría al momento
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+// ============================================================================
+//  MODELO: Reservation  (Apartado / Layaway)
+// ----------------------------------------------------------------------------
+//  Un apartado: el cliente paga un ANTICIPO del 20% y tiene 5 DÍAS para
+//  liquidar el resto. Estas reglas de negocio quedan "grabadas" en los campos.
+//
+//  El `id` usa prefijo propio "APTD-" (ej. "APTD-000007"), generado en el
+//  servidor, para distinguirlo a simple vista de un pedido normal.
+//
+//  `profileId` se deja OPCIONAL a nivel de esquema por flexibilidad, pero en
+//  la práctica exigiremos sesión iniciada para apartar (un compromiso de 5
+//  días es difícil de rastrear para un invitado). Esa regla se aplicará en el
+//  código de la Etapa 4, no aquí.
+// ============================================================================
+model Reservation {
+  id String @id // "APTD-XXXXXX", generado en el cliente (por ahora)
+
+  profileId String  @db.Uuid
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  // Snapshot inmutable del producto (nombre ya resuelto al idioma, precio,
+  // imagen, categoría, etc.). Es un "documento", por eso va como JSON.
+  productSnapshot Json
+
+  // Montos en pesos enteros. depositAmount = 20% del precio; remaining = resto.
+  depositAmount   Int
+  remainingAmount Int
+
+  // Estado persistido: ACTIVO / COMPLETADO / CANCELADO.
+  // "expirado" NO se guarda: se calcula al leer comparando expiresAt.
+  status ReservationStatus @default(ACTIVO)
+
+  // "pickup" | "shipping" | null. Se llena al completar.
+  deliveryMethod String?
+
+  expiresAt   DateTime
+  completedAt DateTime?
+
+  // Para el pago real del anticipo (se llena en la Etapa 4).
+  paypalOrderId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([profileId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("reservations")
+}
+// ============================================================================
+//  MODELO: Review  (Reseña)
+// ----------------------------------------------------------------------------
+//  Reseña de un producto. Requiere cuenta (profileId obligatorio). Las reseñas
+//  NO se traducen (las escribe el cliente en su idioma). La restricción
+//  @@unique evita que una misma persona reseñe el mismo producto dos veces.
+// ============================================================================
+model Review {
+  id        String  @id @default(uuid())
+  profileId String  @db.Uuid
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  productSlug String // producto reseñado (referencia al catálogo en código)
+  rating      Int // calificación 1..5 (validamos el rango en el servidor)
+  title       String?
+  body        String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([profileId, productSlug]) // una reseña por persona y producto
+  @@index([productSlug]) // para listar reseñas de un producto rápido
+  @@map("reviews")
+}
+
+// ============================================================================
+//  MODELO: WishlistItem  (Lista de deseos)
+// ----------------------------------------------------------------------------
+//  Un producto marcado como favorito por un usuario. Es una simple relación
+//  (usuario <-> productSlug). El @@unique impide duplicados.
+// ============================================================================
+model WishlistItem {
+  id        String  @id @default(uuid())
+  profileId String  @db.Uuid
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  productSlug String
+  createdAt   DateTime @default(now())
+
+  @@unique([profileId, productSlug])
+  @@index([profileId])
+  @@map("wishlist_items")
+}
+
+// ============================================================================
+//  MODELO: CartItem  (Carrito persistente)
+// ----------------------------------------------------------------------------
+//  El carrito de un usuario CON SESIÓN, guardado en la BD para que lo
+//  "siga" entre dispositivos. Los invitados seguirán usando localStorage; al
+//  iniciar sesión, fusionaremos su carrito local con este (lógica de Etapa 3).
+//
+//  Por ahora asumimos un renglón por producto (@@unique por profile+slug) y
+//  una cantidad. Si más adelante los productos tienen variantes reales
+//  (color/material seleccionable), añadiremos ese campo a la clave única.
+// ============================================================================
+model CartItem {
+  id        String  @id @default(uuid())
+  profileId String  @db.Uuid
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  productSlug String
+  quantity    Int    @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([profileId, productSlug])
+  @@index([profileId])
+  @@map("cart_items")
+}

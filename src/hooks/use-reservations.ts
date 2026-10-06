@@ -1,32 +1,35 @@
 /**
  * ============================================================================
- * USE RESERVATIONS — KATALINA
+ * USE RESERVATIONS — MKATALINA (Fase 13 · Etapa 3: persistencia real)
  * ============================================================================
  *
- * Hook que expone API limpia sobre el reservation-store.
+ * QUÉ CAMBIÓ
+ * ----------
+ * El motor pasó de localStorage a la BASE DE DATOS (acciones de servidor). La
+ * API que consume la UI es la MISMA de antes (mismos arrays filtrados, mismo
+ * createReservation/completeReservation/cancelReservation, activeCount), más un
+ * `isLoading` nuevo (aditivo). Por eso mis-apartados y ReservationCard siguen
+ * funcionando casi igual.
  *
- * Patrón idéntico a useCart y useWishlist: el componente no conoce Zustand,
- * solo consume este hook con tipos claros.
+ * PATRÓN
+ * ------
+ *   - Espera a que la sesión se resuelva (if authLoading return) — evita el
+ *     bucle infinito entre instancias que sufrimos con la wishlist.
+ *   - Trae los apartados de la base una vez y los cachea en el store.
+ *   - Crear/completar/cancelar son OPTIMISTAS: la UI cambia al instante y se
+ *     persiste en segundo plano; si la base falla, se revierte.
  *
- * Cuando llegue el backend en Fase 12:
- *   - Reemplazamos la implementación por queries/mutations (TanStack Query)
- *   - Los componentes que consumen el hook NO cambian
- *
- * Comportamiento sin sesión:
- *   - reservations devuelve []
- *   - createReservation no-op
- *   - Componentes que llaman create deben verificar sesión antes (igual
- *     que con wishlist)
- *
- * Filtrado automático por status:
- *   El hook expone arrays filtrados para conveniencia: activeReservations,
- *   completedReservations, expiredReservations. Esto evita que cada
- *   componente reimplemente la lógica de filtrado.
+ * NOTA SOBRE EL PAGO (Etapa 4)
+ * ----------------------------
+ * En esta etapa el pago del anticipo sigue SIMULADO. El apartado se guarda como
+ * "activo". Cuando conectemos PayPal real (Etapa 4), el cobro del anticipo y la
+ * generación del apartado se moverán al servidor.
  * ============================================================================
  */
 
 "use client";
 
+import { useEffect } from "react";
 import { useReservationStore } from "@/stores/reservation-store";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -37,100 +40,78 @@ import {
   type DeliveryMethod,
   type ProductSnapshot,
 } from "@/types/reservation";
+import {
+  getMyReservations,
+  createReservationAction,
+  completeReservationAction,
+  cancelReservationAction,
+} from "@/actions/reservations";
 
-/**
- * Input para crear un apartado.
- * El hook se encarga de generar id, fechas, montos.
- */
+/** Input para crear un apartado (igual que antes). */
 export interface CreateReservationInput {
   product: ProductSnapshot;
 }
 
 interface UseReservationsReturn {
-  /** Todas las reservaciones del usuario (sin filtrar) */
   reservations: Reservation[];
-
-  /** Apartados vigentes (no expirados, no completados, no cancelados) */
   activeReservations: Reservation[];
-
-  /** Apartados completados (pago final realizado) */
   completedReservations: Reservation[];
-
-  /** Apartados expirados (pasaron 5 días sin pagar) */
   expiredReservations: Reservation[];
-
-  /** Apartados cancelados voluntariamente */
   cancelledReservations: Reservation[];
-
-  /**
-   * Cantidad de apartados ACTIVOS (los que necesitan atención).
-   * Es lo que mostramos como badge en el sidebar de cuenta.
-   */
   activeCount: number;
-
-  /**
-   * Crear un apartado nuevo. Requiere sesión.
-   * Devuelve el apartado creado o null si falló (sin sesión).
-   */
+  /** True mientras se traen los apartados de la base por primera vez. */
+  isLoading: boolean;
   createReservation: (input: CreateReservationInput) => Reservation | null;
-
-  /**
-   * Completar un apartado (pagar el resto).
-   * No-op si el usuario no es dueño del apartado.
-   */
   completeReservation: (
     reservationId: string,
-    deliveryMethod: DeliveryMethod
+    deliveryMethod: DeliveryMethod,
   ) => void;
-
-  /** Cancelar un apartado voluntariamente */
   cancelReservation: (reservationId: string) => void;
-
-  /** Buscar un apartado por ID */
   getReservationById: (id: string) => Reservation | undefined;
 }
 
 export function useReservations(): UseReservationsReturn {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
 
-  const reservationsByUserId = useReservationStore(
-    (state) => state.reservationsByUserId
-  );
-  const createInStore = useReservationStore((state) => state.createReservation);
-  const completeInStore = useReservationStore(
-    (state) => state.completeReservation
-  );
-  const cancelInStore = useReservationStore((state) => state.cancelReservation);
+  const reservations = useReservationStore((s) => s.reservations);
+  const status = useReservationStore((s) => s.status);
+  const beginLoad = useReservationStore((s) => s.beginLoad);
+  const finishLoad = useReservationStore((s) => s.finishLoad);
+  const addReservation = useReservationStore((s) => s.addReservation);
+  const removeReservation = useReservationStore((s) => s.removeReservation);
+  const replaceReservation = useReservationStore((s) => s.replaceReservation);
+  const reset = useReservationStore((s) => s.reset);
 
-  // Apartados del usuario actual (o array vacío si no hay sesión)
-  const reservations = user
-    ? (reservationsByUserId[user.id] ?? [])
-    : [];
+  // Sincronización con la base (mismo patrón/gate que la wishlist).
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      if (status !== "unloaded") reset();
+      return;
+    }
+    if (beginLoad()) {
+      getMyReservations()
+        .then((rows) => finishLoad(rows))
+        .catch(() => finishLoad([]));
+    }
+  }, [authLoading, user, status, beginLoad, finishLoad, reset]);
 
-  /**
-   * Filtrar por status efectivo (que combina persistido + expiración).
-   * Esto es importante: un apartado con status "active" en la DB puede
-   * estar realmente "expired" si pasaron 5 días. getEffectiveStatus
-   * encapsula esa lógica.
-   */
+  // Arrays filtrados por status EFECTIVO (incluye el cálculo de expiración).
   const activeReservations = reservations.filter(
-    (r) => getEffectiveStatus(r) === "active"
+    (r) => getEffectiveStatus(r) === "active",
   );
   const completedReservations = reservations.filter(
-    (r) => getEffectiveStatus(r) === "completed"
+    (r) => getEffectiveStatus(r) === "completed",
   );
   const expiredReservations = reservations.filter(
-    (r) => getEffectiveStatus(r) === "expired"
+    (r) => getEffectiveStatus(r) === "expired",
   );
   const cancelledReservations = reservations.filter(
-    (r) => getEffectiveStatus(r) === "cancelled"
+    (r) => getEffectiveStatus(r) === "cancelled",
   );
 
-  /**
-   * Crear apartado: genera id, fechas, calcula montos.
-   */
   const createReservation = (
-    input: CreateReservationInput
+    input: CreateReservationInput,
   ): Reservation | null => {
     if (!user) return null;
 
@@ -138,15 +119,16 @@ export function useReservations(): UseReservationsReturn {
     const expiresAt = new Date(now);
     expiresAt.setDate(expiresAt.getDate() + RESERVATION_DURATION_DAYS);
 
-    // Calcular anticipo (20% del precio del producto)
-    // Math.round porque pesos mexicanos no usan decimales
+    // Anticipo del 20% (pesos enteros). El servidor lo recalcula por seguridad;
+    // como usa la misma fórmula y el mismo precio, el valor coincide.
     const depositAmount = Math.round(
-      input.product.price * RESERVATION_DEPOSIT_PERCENTAGE
+      input.product.price * RESERVATION_DEPOSIT_PERCENTAGE,
     );
     const remainingAmount = input.product.price - depositAmount;
 
     const reservation: Reservation = {
-      id: `res-${Date.now().toString(36).toUpperCase()}${Math.random()
+      // Prefijo APTD- para distinguirlo de los pedidos (MKTL-).
+      id: `APTD-${Date.now().toString(36).toUpperCase()}${Math.random()
         .toString(36)
         .substring(2, 6)
         .toUpperCase()}`,
@@ -161,26 +143,53 @@ export function useReservations(): UseReservationsReturn {
       completedAt: null,
     };
 
-    createInStore(user.id, reservation);
+    addReservation(reservation); // optimista
+    void createReservationAction(reservation).catch((error) => {
+      removeReservation(reservation.id); // rollback
+      console.error("No se pudo crear el apartado:", error);
+    });
+
     return reservation;
   };
 
   const completeReservation = (
     reservationId: string,
-    deliveryMethod: DeliveryMethod
+    deliveryMethod: DeliveryMethod,
   ) => {
     if (!user) return;
-    completeInStore(user.id, reservationId, deliveryMethod);
+    const prev = reservations.find((r) => r.id === reservationId);
+    if (!prev) return;
+
+    const updated: Reservation = {
+      ...prev,
+      status: "completed",
+      deliveryMethod,
+      completedAt: new Date().toISOString(),
+    };
+    replaceReservation(updated); // optimista
+    void completeReservationAction(reservationId, deliveryMethod).catch(
+      (error) => {
+        replaceReservation(prev); // rollback
+        console.error("No se pudo completar el apartado:", error);
+      },
+    );
   };
 
   const cancelReservation = (reservationId: string) => {
     if (!user) return;
-    cancelInStore(user.id, reservationId);
+    const prev = reservations.find((r) => r.id === reservationId);
+    if (!prev) return;
+
+    const updated: Reservation = { ...prev, status: "cancelled" };
+    replaceReservation(updated); // optimista
+    void cancelReservationAction(reservationId).catch((error) => {
+      replaceReservation(prev); // rollback
+      console.error("No se pudo cancelar el apartado:", error);
+    });
   };
 
-  const getReservationById = (id: string): Reservation | undefined => {
-    return reservations.find((r) => r.id === id);
-  };
+  const getReservationById = (id: string): Reservation | undefined =>
+    reservations.find((r) => r.id === id);
 
   return {
     reservations,
@@ -189,6 +198,7 @@ export function useReservations(): UseReservationsReturn {
     expiredReservations,
     cancelledReservations,
     activeCount: activeReservations.length,
+    isLoading: authLoading || (!!user && status !== "loaded"),
     createReservation,
     completeReservation,
     cancelReservation,

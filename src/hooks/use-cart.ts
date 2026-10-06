@@ -1,93 +1,97 @@
 /**
  * ============================================================================
- * USE CART — KATALINA
+ * USE CART — MKATALINA (Fase 13 · Etapa 3: invitado + base + fusión)
  * ============================================================================
  *
- * Hook que expone una API conveniente sobre el cart-store de Zustand.
+ * MISMA API de siempre (items, itemCount, uniqueCount, subtotal, isEmpty,
+ * addItem, removeItem, updateQuantity, clear) + un `isLoading` nuevo. Por eso
+ * la página de carrito, el checkout y el header siguen funcionando.
  *
- * Diferencia con acceder directo al store:
- *   - El store solo guarda `{ slug, quantity }` por item.
- *   - Este hook hace los lookups de producto y calcula valores derivados
- *     como subtotal, itemCount, etc.
+ * DÓNDE SE GUARDA EL CARRITO
+ * --------------------------
+ *   - Invitado (sin sesión) → localStorage (llave GUEST_CART_KEY).
+ *   - Con sesión            → base de datos (acciones de servidor).
+ * Regla clave: mientras hay sesión, NUNCA se escribe en la llave de invitado.
+ * Así, si al iniciar sesión esa llave tiene algo, sabemos que es un carrito de
+ * invitado que hay que FUSIONAR con el de la cuenta.
  *
- * Cambios respecto a la versión placeholder anterior:
- *   - Ya NO devuelve mock data
- *   - Conecta al store real de Zustand
- *   - Expone valores derivados (subtotal, itemCount, isEmpty)
- *   - Re-exporta las acciones del store con la misma signature
+ * FLUJO DE CARGA (efecto de sincronización)
+ * -----------------------------------------
+ *   - Espera a que la sesión se resuelva (if authLoading return).
+ *   - Con sesión: si hay carrito de invitado pendiente, lo fusiona con la base
+ *     (suma cantidades), limpia el local, y carga el resultado. Si no, carga la
+ *     base tal cual.
+ *   - Sin sesión: carga el carrito de invitado de localStorage.
+ *   - Al cambiar el dueño (login/logout) se vuelve a cargar.
  *
- * Hidratación (importante en Next.js + persist):
- *   Cuando Next.js renderiza la página en el servidor, NO tiene acceso a
- *   localStorage (que es API del navegador). Resultado: el servidor renderiza
- *   `items: []`, pero el cliente al hidratarse lee localStorage y puede
- *   tener items. Esto causa una mismatch de hydration.
+ * MUTACIONES
+ * ----------
+ * Son optimistas: cambian el store al instante y luego persisten (localStorage
+ * o base, según sesión). En base, el guardado es en 2° plano.
  *
- *   Para evitarlo:
- *     - Los componentes que consumen useCart deben renderizarse igual en
- *       servidor y cliente al inicio (mostrar "0 items" inicialmente).
- *     - Después del primer render del cliente, Zustand actualiza el state
- *       con los datos de localStorage y los componentes re-renderizan.
- *
- *   El truco: useState con flag `isMounted` que detecta cuándo estamos
- *   en el cliente. Aplicamos esto en los lugares donde mostramos el conteo
- *   visible (header). Para el resto, no es problema porque la página de
- *   carrito solo se ve después del primer render cliente.
+ * isEmpty solo es true UNA VEZ que el carrito terminó de cargar. Así, durante
+ * la carga, ni el checkout ni la página de carrito creen que está vacío (evita
+ * el rebote a /carrito y el parpadeo de "carrito vacío").
  * ============================================================================
  */
 
 "use client";
 
-import { useCartStore } from "@/stores/cart-store";
+import { useEffect } from "react";
+import { useCartStore, type CartItem } from "@/stores/cart-store";
+import { useAuth } from "@/hooks/use-auth";
 import { getProductBySlug } from "@/data/products";
 import type { Product } from "@/types/product";
+import { getMyCart, saveMyCart, mergeGuestCartIntoDb } from "@/actions/cart";
 
-/**
- * CartItemWithProduct — un item del carrito con el producto resuelto.
- *
- * El store guarda solo { slug, quantity }. Cuando un componente quiere
- * mostrar el carrito, necesita el producto completo (nombre, precio, imagen).
- * Este hook hace el lookup y devuelve la combinación enriquecida.
- *
- * Si el producto ya no existe en productsData (fue eliminado del catálogo),
- * el item se filtra automáticamente — no aparece en `items`.
- */
+/** Llave de localStorage SOLO para el carrito de invitado. */
+const GUEST_CART_KEY = "mkatalina-cart-guest-v1";
+
+function readGuestCart(): CartItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(GUEST_CART_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as CartItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeGuestCart(items: CartItem[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(GUEST_CART_KEY, JSON.stringify(items));
+  } catch {
+    // localStorage puede fallar (Safari incógnito); no es crítico.
+  }
+}
+
+function clearGuestCart(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(GUEST_CART_KEY);
+  } catch {
+    // ignorar
+  }
+}
+
 export interface CartItemWithProduct {
   slug: string;
   quantity: number;
   product: Product;
-  /** Subtotal de este item específico: product.price × quantity */
   lineTotal: number;
 }
 
 interface UseCartReturn {
-  /** Items del carrito con sus productos resueltos */
   items: CartItemWithProduct[];
-
-  /**
-   * Total de UNIDADES en el carrito (suma de quantities).
-   * Ej. si tengo 2 aretes + 3 pulseras = 5 unidades.
-   * NO es el número de items distintos (que serían 2).
-   * Esto es lo que mostramos en el badge del header.
-   */
   itemCount: number;
-
-  /**
-   * Cantidad de productos DISTINTOS en el carrito.
-   * Ej. si tengo 2 aretes + 3 pulseras = 2 productos distintos.
-   * Útil para mensajes tipo "1 producto en tu carrito" vs "3 productos".
-   */
   uniqueCount: number;
-
-  /**
-   * Suma del precio × cantidad de todos los items.
-   * NO incluye envío ni impuestos — eso se calcula en el checkout.
-   */
   subtotal: number;
-
-  /** Carrito vacío shortcut: items.length === 0 */
   isEmpty: boolean;
-
-  /** Acciones — pasan tal cual al store */
+  /** True mientras el carrito aún se está cargando (base o localStorage). */
+  isLoading: boolean;
   addItem: (slug: string, quantity: number) => void;
   removeItem: (slug: string) => void;
   updateQuantity: (slug: string, quantity: number) => void;
@@ -95,27 +99,80 @@ interface UseCartReturn {
 }
 
 export function useCart(): UseCartReturn {
-  // Suscribirse al store. Cuando cambia `items` de Zustand, este hook
-  // re-renderiza automáticamente.
-  const rawItems = useCartStore((state) => state.items);
-  const addItem = useCartStore((state) => state.addItem);
-  const removeItem = useCartStore((state) => state.removeItem);
-  const updateQuantity = useCartStore((state) => state.updateQuantity);
-  const clear = useCartStore((state) => state.clear);
+  const { user, isLoading: authLoading } = useAuth();
+
+  const rawItems = useCartStore((s) => s.items);
+  const syncOwner = useCartStore((s) => s.syncOwner);
+  const beginSync = useCartStore((s) => s.beginSync);
+  const finishSync = useCartStore((s) => s.finishSync);
+  const addItemStore = useCartStore((s) => s.addItem);
+  const removeItemStore = useCartStore((s) => s.removeItem);
+  const updateQuantityStore = useCartStore((s) => s.updateQuantity);
+  const clearStore = useCartStore((s) => s.clear);
+
+  // --- Sincronización con la fuente correcta (base o localStorage) ---
+  useEffect(() => {
+    if (authLoading) return;
+
+    const owner = user ? user.id : null;
+    if (!beginSync(owner)) return;
+
+    (async () => {
+      if (user) {
+        // Con sesión: ¿hay carrito de invitado pendiente de fusionar?
+        const guestItems = readGuestCart();
+        if (guestItems.length > 0) {
+          const merged = await mergeGuestCartIntoDb(guestItems);
+          clearGuestCart(); // el carrito de invitado ya se absorbió en la cuenta
+          finishSync(merged, user.id);
+        } else {
+          const dbItems = await getMyCart();
+          finishSync(dbItems, user.id);
+        }
+      } else {
+        // Invitado: cargar de localStorage.
+        finishSync(readGuestCart(), null);
+      }
+    })().catch(() => finishSync([], owner));
+  }, [authLoading, user, syncOwner, beginSync, finishSync]);
 
   /**
-   * Enriquecer cada item con su producto. Si un producto ya no existe,
-   * filtramos ese item silenciosamente.
-   *
-   * NOTA sobre performance: este map se ejecuta en cada render que use el
-   * hook. Para un carrito típico de 1-10 items es trivial. Si en el futuro
-   * tuviéramos carritos enormes, podríamos memoizar con useMemo, pero hoy
-   * sería optimización prematura.
+   * Persiste el estado actual del store donde corresponda.
+   * Lee los items EN VIVO (getState) para tomarlos ya mutados.
    */
+  const persist = () => {
+    const items = useCartStore.getState().items;
+    if (user) {
+      void saveMyCart(items).catch((error) =>
+        console.error("No se pudo guardar el carrito:", error),
+      );
+    } else {
+      writeGuestCart(items);
+    }
+  };
+
+  const addItem = (slug: string, quantity: number) => {
+    addItemStore(slug, quantity);
+    persist();
+  };
+  const removeItem = (slug: string) => {
+    removeItemStore(slug);
+    persist();
+  };
+  const updateQuantity = (slug: string, quantity: number) => {
+    updateQuantityStore(slug, quantity);
+    persist();
+  };
+  const clear = () => {
+    clearStore();
+    persist();
+  };
+
+  // --- Enriquecer items con su producto (igual que antes) ---
   const items: CartItemWithProduct[] = rawItems
     .map((item) => {
       const product = getProductBySlug(item.slug);
-      if (!product) return null; // Producto eliminado → ignorar
+      if (!product) return null;
       return {
         slug: item.slug,
         quantity: item.quantity,
@@ -125,11 +182,15 @@ export function useCart(): UseCartReturn {
     })
     .filter((item): item is CartItemWithProduct => item !== null);
 
-  // Cálculos derivados
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const uniqueCount = items.length;
   const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
-  const isEmpty = items.length === 0;
+
+  // isLoading: true mientras no se resuelve la sesión o no se ha cargado el carrito.
+  const isLoading = authLoading || syncOwner === undefined;
+
+  // isEmpty solo es fiable una vez cargado (evita rebotes/parpadeos).
+  const isEmpty = !isLoading && items.length === 0;
 
   return {
     items,
@@ -137,6 +198,7 @@ export function useCart(): UseCartReturn {
     uniqueCount,
     subtotal,
     isEmpty,
+    isLoading,
     addItem,
     removeItem,
     updateQuantity,

@@ -1,28 +1,21 @@
 /**
  * ============================================================================
- * PAGE: /[locale]/(account)/wishlist — KATALINA (Fase 12 Turno 3B.3: bilingüe)
+ * PAGE: /[locale]/(account)/wishlist — MKATALINA
  * ============================================================================
  *
- * Cambios respecto a la versión anterior:
- *   - import Link de "next/link" → "@/i18n/navigation" (mantiene prefijo
- *     de locale al navegar al CTA "Explorar productos")
- *   - useTranslations agregado con namespace wishlistPage
- *   - Header con título, subtítulo + pluralización (singular/plural)
- *   - EmptyWishlist con título, descripción y CTA traducidos
+ * Cambio de la Fase 13 (Etapa 3):
+ *   - Ahora la wishlist viene de la base de datos (vía el hook useWishlist,
+ *     que la trae al cargar). Como esa carga es asíncrona, agregamos un estado
+ *     de CARGA: mientras `isLoading` es true, mostramos un placeholder en vez
+ *     del mensaje de "wishlist vacía". Sin esto, la página mostraría "vacía"
+ *     un instante antes de que llegaran los datos de la base (un parpadeo feo).
  *
  * Lo que NO cambia:
  *   - useWishlist().items sigue devolviendo slugs
  *   - getProductBySlug resuelve cada slug a Product completo (bilingüe)
- *   - ProductCard ya es bilingüe → muestra nombres en idioma activo
- *
- * Sobre el wishlist + factura inmutable:
- *   La wishlist guarda solo slugs (referencias). Cuando el usuario cambia
- *   de idioma, los productos se re-resuelven y se muestran en el nuevo
- *   idioma. Es el comportamiento natural — la wishlist no es una factura.
- *   Es una "lista de referencias", no un documento histórico.
- *
- *   Esto es opuesto a Apartados/Órdenes, que SÍ son documentos históricos
- *   y guardan name como string resuelto (factura inmutable).
+ *   - ProductCard ya es bilingüe → muestra nombres en el idioma activo
+ *   - La wishlist guarda solo referencias (slugs): al cambiar de idioma, los
+ *     productos se re-resuelven al nuevo idioma (no es una factura inmutable).
  * ============================================================================
  */
 
@@ -39,13 +32,11 @@ import { cn } from "@/lib/utils";
 
 export default function WishlistPage() {
   const t = useTranslations("wishlistPage");
-  const { items } = useWishlist();
+  const { items, isLoading } = useWishlist();
 
   /**
    * Resolver slugs a productos completos.
    * Filtramos null (productos que ya no existen en el catálogo).
-   * Cada Product devuelto tiene name como LocalizedString — ProductCard
-   * se encarga de resolverlo al idioma activo.
    */
   const products = items
     .map((slug) => getProductBySlug(slug))
@@ -54,14 +45,15 @@ export default function WishlistPage() {
   const isEmpty = products.length === 0;
 
   /**
-   * Subtítulo dinámico según count.
-   * Singular vs plural con claves separadas.
+   * Subtítulo dinámico. Mientras carga no mostramos conteo (aún no es fiable).
    */
-  const subtitleText = isEmpty
-    ? t("subtitleEmpty")
-    : products.length === 1
-      ? t("subtitleSingular", { count: products.length })
-      : t("subtitlePlural", { count: products.length });
+  const subtitleText = isLoading
+    ? ""
+    : isEmpty
+      ? t("subtitleEmpty")
+      : products.length === 1
+        ? t("subtitleSingular", { count: products.length })
+        : t("subtitlePlural", { count: products.length });
 
   return (
     <div className="space-y-8">
@@ -70,21 +62,33 @@ export default function WishlistPage() {
         <h1 className="font-display text-3xl md:text-4xl font-medium mb-2">
           {t("title")}
         </h1>
-        <p className="text-sm text-muted-foreground">{subtitleText}</p>
+        {subtitleText && (
+          <p className="text-sm text-muted-foreground">{subtitleText}</p>
+        )}
       </header>
 
-      {isEmpty ? <EmptyWishlist /> : <WishlistGrid products={products} />}
+      {/*
+       * Tres estados:
+       *   - Cargando: placeholder (evita el parpadeo de "vacía").
+       *   - Cargado y vacío: mensaje de wishlist vacía.
+       *   - Cargado con productos: la cuadrícula.
+       */}
+      {isLoading ? (
+        <div className="h-96" aria-hidden="true" />
+      ) : isEmpty ? (
+        <EmptyWishlist />
+      ) : (
+        <WishlistGrid products={products} />
+      )}
     </div>
   );
 }
 
 /**
  * WishlistGrid — grid de productos guardados.
- *
- * Reutiliza ProductCard del catálogo. Como ProductCard ya tiene el corazón
- * de wishlist integrado y bilingüe, no necesitamos lógica adicional aquí.
- * Al quitar de wishlist, el grid se actualiza automáticamente (useWishlist
- * es reactivo via Zustand).
+ * Reutiliza ProductCard (que ya trae el corazón integrado y bilingüe). Al
+ * quitar de la wishlist, el grid se actualiza solo porque useWishlist es
+ * reactivo (la caché del store cambia y re-renderiza).
  */
 function WishlistGrid({
   products,
@@ -94,11 +98,7 @@ function WishlistGrid({
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-10">
       {products.map((product, index) => (
-        <ProductCard
-          key={product.id}
-          product={product}
-          priority={index < 4}
-        />
+        <ProductCard key={product.id} product={product} priority={index < 4} />
       ))}
     </div>
   );
@@ -106,8 +106,6 @@ function WishlistGrid({
 
 /**
  * EmptyWishlist — estado vacío amigable.
- *
- * Textos del namespace wishlistPage.empty.
  */
 function EmptyWishlist() {
   const t = useTranslations("wishlistPage.empty");
@@ -126,12 +124,7 @@ function EmptyWishlist() {
         {t("title")}
       </h2>
 
-      <p
-        className={cn(
-          "text-sm text-muted-foreground",
-          "max-w-md mx-auto mb-8"
-        )}
-      >
+      <p className={cn("text-sm text-muted-foreground", "max-w-md mx-auto mb-8")}>
         {t("description")}
       </p>
 

@@ -1,29 +1,19 @@
 /**
  * ============================================================================
- * PAGE: /[locale]/(account)/mis-apartados — KATALINA (Fase 12 Turno 3B.3: bilingüe)
+ * PAGE: /[locale]/(account)/mis-apartados — MKATALINA
  * ============================================================================
  *
- * Cambios respecto a la versión anterior:
- *   - import Link cambia de "next/link" a "@/i18n/navigation"
- *   - useTranslations agregado con namespace reservation.page
- *   - Todos los textos hardcoded ahora vienen de messages.json:
- *     título, contador, tabs, empty states (general + por tab), CTA
+ * Cambio de la Fase 13 (Etapa 3):
+ *   - Los apartados ahora vienen de la base de datos (vía useReservations, que
+ *     los trae al cargar). Como esa carga es asíncrona, agregamos un estado de
+ *     CARGA: mientras `isLoading` es true, mostramos un placeholder en vez del
+ *     empty state, para no mostrar "no tienes apartados" un instante antes de
+ *     que lleguen los datos.
  *
  * Lo que NO cambia:
- *   - La lógica de filtrado de reservaciones (active/completed/expired/cancelled)
- *   - Los hooks (useReservations, useState)
- *   - El layout, colores, animaciones, tabs role/aria
- *
- * Pluralización del contador:
- *   En el namespace de messages tenemos dos claves:
- *     - subtitleSingular: "{count} apartado en total"
- *     - subtitlePlural: "{count} apartados en total"
- *   Elegimos cuál usar según count === 1.
- *
- *   Nota: para sitios con más complejidad de plurales (idiomas con dual,
- *   plurales múltiples como ruso, etc.), next-intl soporta ICU MessageFormat
- *   completo con sintaxis `{count, plural, one {...} other {...}}`. Para
- *   es/en con singular/plural simple, esta solución es más legible.
+ *   - La lógica de tabs (activos / completados / historial)
+ *   - El filtrado por status efectivo (active/completed/expired/cancelled)
+ *   - El layout, tabs role/aria, empty states
  * ============================================================================
  */
 
@@ -48,17 +38,18 @@ export default function ReservationsPage() {
     completedReservations,
     expiredReservations,
     cancelledReservations,
+    isLoading,
   } = useReservations();
 
   const [activeTab, setActiveTab] = useState<TabId>("active");
 
-  // Historial combina expirados + cancelados, ordenados por fecha
+  // Historial = expirados + cancelados, ordenados por fecha (más reciente primero).
   const historyReservations = [
     ...expiredReservations,
     ...cancelledReservations,
   ].sort(
     (a, b) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 
   const totalCount =
@@ -66,9 +57,6 @@ export default function ReservationsPage() {
     completedReservations.length +
     historyReservations.length;
 
-  /**
-   * Tabs configuration con labels traducidos.
-   */
   const tabs: Array<{
     id: TabId;
     label: string;
@@ -95,14 +83,12 @@ export default function ReservationsPage() {
     },
   ];
 
-  const currentTab = tabs.find((t) => t.id === activeTab)!;
+  const currentTab = tabs.find((tab) => tab.id === activeTab)!;
 
-  /**
-   * Subtítulo dinámico con count.
-   * Elegimos singular vs plural según el count exacto.
-   */
-  const subtitleText =
-    totalCount === 0
+  // Mientras carga no mostramos conteo (aún no es fiable).
+  const subtitleText = isLoading
+    ? ""
+    : totalCount === 0
       ? t("subtitleEmpty")
       : totalCount === 1
         ? t("subtitleSingular", { count: totalCount })
@@ -115,14 +101,15 @@ export default function ReservationsPage() {
         <h1 className="font-display text-3xl md:text-4xl font-medium mb-2">
           {t("title")}
         </h1>
-        <p className="text-sm text-muted-foreground">{subtitleText}</p>
+        {subtitleText && (
+          <p className="text-sm text-muted-foreground">{subtitleText}</p>
+        )}
       </header>
 
-      {/*
-       * Si no hay NINGÚN apartado en ningún estado, mostramos empty state
-       * grande SIN tabs.
-       */}
-      {totalCount === 0 ? (
+      {isLoading ? (
+        // Placeholder mientras se traen los apartados de la base.
+        <div className="h-96" aria-hidden="true" />
+      ) : totalCount === 0 ? (
         <EmptyAllReservations />
       ) : (
         <>
@@ -146,7 +133,7 @@ export default function ReservationsPage() {
                   "flex items-center gap-2",
                   activeTab === tab.id
                     ? "border-accent text-accent"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
                 )}
               >
                 <span>{tab.label}</span>
@@ -158,7 +145,7 @@ export default function ReservationsPage() {
                       "text-[10px] font-medium tabular-nums",
                       activeTab === tab.id
                         ? "bg-accent text-accent-foreground"
-                        : "bg-muted text-muted-foreground"
+                        : "bg-muted text-muted-foreground",
                     )}
                   >
                     {tab.count}
@@ -230,10 +217,6 @@ function EmptyAllReservations() {
 function EmptyTabState({ tabId }: { tabId: TabId }) {
   const t = useTranslations("reservation.page.emptyTab");
 
-  /**
-   * Mapeamos cada tabId a su Icon + claves de traducción.
-   * Las claves apuntan a sub-namespaces dentro de reservation.page.emptyTab.
-   */
   const config = {
     active: {
       Icon: Clock,

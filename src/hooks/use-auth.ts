@@ -1,62 +1,28 @@
 /**
  * ============================================================================
- * USE AUTH — KATALINA (Fase 12 Turno 3B.4: errorCode bilingüe)
+ *  USE AUTH — MKATALINA (Fase 13 · Etapa 3: + updateProfile)
  * ============================================================================
  *
- * Cambios respecto a la versión anterior:
- *   - `AuthResult.error: string` cambia a `AuthResult.errorCode: string`
- *   - El hook devuelve códigos identificables en lugar de texto traducido
- *   - Los códigos posibles son:
- *       login → "loginEmptyFields" | "loginInvalidCredentials"
- *       register → "registerEmptyFields" | "registerInvalidPassword" | "registerEmailTaken"
+ *  Igual que la versión de la Etapa 2 (login/register/logout con Supabase),
+ *  pero se agrega updateProfile para editar el nombre del usuario. Todas las
+ *  mutaciones de autenticación viven aquí, en un solo lugar.
  *
- * Lo que NO cambia:
- *   - Toda la lógica de validación (campos vacíos, password rules, email duplicado)
- *   - El comportamiento de éxito (devolver { success: true })
- *   - La integración con auth-store
- *   - La creación del usuario nuevo en register()
- *
- * ─── POR QUÉ errorCode EN VEZ DE error ────────────────────────────────
- *
- * El hook useAuth NO debería conocer i18n. Devolver un mensaje en español
- * acopla el hook al locale y obliga a tener una versión por idioma.
- *
- * En cambio, devolver un código identificable (string estable) permite que
- * cada componente traduzca el código al locale activo usando su propio t().
- *
- * Patrón equivalente a HTTP status codes / API error codes en backends reales.
- * El backend devuelve { code: "INVALID_CREDENTIALS" }, no "Credenciales
- * inválidas". El cliente traduce.
- *
- * En los componentes (LoginForm, RegisterForm) hacemos:
- *   t(`auth.errors.${result.errorCode}`)
- *
- * Si en el futuro queremos cambiar el wording de "Email o contraseña
- * incorrectos" a "Credenciales no válidas", lo cambiamos SOLO en messages.json,
- * sin tocar el hook ni los formularios.
- *
- * ─── ELECCIÓN DE NOMBRES DE CÓDIGOS ────────────────────────────────────
- *
- * Prefijo por operación (login/register) para evitar colisiones y para
- * que sea obvio de qué viene el error. Si después añadimos logout o
- * recoverPassword, sigue el mismo patrón:
- *   - logoutFailed
- *   - recoverEmailNotFound
- *   - etc.
- * ─────────────────────────────────────────────────────────────────────
+ *  De dónde sale cada cosa:
+ *    - user / isAuthenticated : sesión real de Supabase (cookies) + listener.
+ *    - login / register / logout : llaman a Supabase.
+ *    - updateProfile : actualiza el nombre en los metadatos del usuario
+ *      (cliente, refresca la UI al instante) y sincroniza la tabla profiles
+ *      (servidor).
+ * ============================================================================
  */
 
 "use client";
 
-import { useAuthStore } from "@/stores/auth-store";
-import {
-  validateCredentials,
-  findUserByEmail,
-  isPasswordValid,
-  stripPassword,
-  type AuthUser,
-  type MockUserCredentials,
-} from "@/data/mock-users";
+import { useState, useEffect, useMemo } from "react";
+import type { User } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
+import { type AuthUser, isPasswordValid } from "@/data/mock-users";
+import { updateMyProfile } from "@/actions/profile";
 
 export interface RegisterInput {
   email: string;
@@ -65,14 +31,6 @@ export interface RegisterInput {
   lastName: string;
 }
 
-/**
- * AuthResult — resultado de las operaciones de auth.
- *
- * Cambio: `error: string` → `errorCode: string`.
- *
- * Los códigos posibles están documentados en cada función (login, register).
- * El componente caller resuelve `t(\`auth.errors.${errorCode}\`)`.
- */
 export interface AuthResult {
   success: boolean;
   /** Código del error si success === false. Resuelve a auth.errors.{errorCode} */
@@ -82,99 +40,172 @@ export interface AuthResult {
 interface UseAuthReturn {
   isAuthenticated: boolean;
   requiresAuth: boolean;
+  /** true mientras todavía no sabemos si hay sesión (primera carga). */
+  isLoading: boolean;
   user: AuthUser | null;
-
-  /**
-   * Inicia sesión.
-   * Códigos de error posibles:
-   *   - "loginEmptyFields" → email o password vacíos
-   *   - "loginInvalidCredentials" → email o password incorrectos (genérico
-   *     por seguridad, no revela si el email existe o no)
-   */
   login: (email: string, password: string) => Promise<AuthResult>;
-
-  /**
-   * Registra un nuevo usuario y lo inicia sesión.
-   * Códigos de error posibles:
-   *   - "registerEmptyFields" → algún campo obligatorio vacío
-   *   - "registerInvalidPassword" → password no cumple PASSWORD_RULES
-   *   - "registerEmailTaken" → email ya está registrado
-   */
   register: (data: RegisterInput) => Promise<AuthResult>;
+  logout: () => Promise<void>;
+  /** Actualiza el nombre del usuario (metadatos + tabla profiles). */
+  updateProfile: (firstName: string, lastName: string) => Promise<AuthResult>;
+}
 
-  logout: () => void;
+/**
+ * Convierte el usuario de Supabase al tipo AuthUser que espera la UI.
+ * firstName/lastName viven en user_metadata (los guardamos al registrar);
+ * si por alguna razón no están, devolvemos cadena vacía en vez de undefined.
+ */
+function mapSupabaseUser(supaUser: User | null): AuthUser | null {
+  if (!supaUser) return null;
+  const meta = supaUser.user_metadata ?? {};
+  return {
+    id: supaUser.id,
+    email: supaUser.email ?? "",
+    firstName: typeof meta.firstName === "string" ? meta.firstName : "",
+    lastName: typeof meta.lastName === "string" ? meta.lastName : "",
+    createdAt: supaUser.created_at,
+  };
 }
 
 export function useAuth(): UseAuthReturn {
-  const currentUser = useAuthStore((state) => state.currentUser);
-  const registeredUsers = useAuthStore((state) => state.registeredUsers);
-  const setCurrentUser = useAuthStore((state) => state.setCurrentUser);
-  const addRegisteredUser = useAuthStore((state) => state.addRegisteredUser);
-  const storeLogout = useAuthStore((state) => state.logout);
+  // Cliente de Supabase para el navegador. createClient() reutiliza una sola
+  // instancia internamente; useMemo solo estabiliza la referencia para el
+  // useEffect de abajo.
+  const supabase = useMemo(() => createClient(), []);
+
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // onAuthStateChange se dispara UNA vez al suscribirse (evento
+    // INITIAL_SESSION) con la sesión actual, y luego en cada cambio: login,
+    // logout, refresco de token y USER_UPDATED (al editar el perfil). Con esto
+    // el estado siempre está al día, incluso entre pestañas.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(mapSupabaseUser(session?.user ?? null));
+      setIsLoading(false);
+    });
+
+    // Al desmontar, cancelamos la suscripción para no dejar listeners colgados.
+    return () => subscription.unsubscribe();
+  }, [supabase]);
 
   const login = async (
     email: string,
-    password: string
+    password: string,
   ): Promise<AuthResult> => {
-    // Campos obligatorios
     if (!email.trim() || !password) {
       return { success: false, errorCode: "loginEmptyFields" };
     }
 
-    // Validar credenciales
-    const user = validateCredentials(email, password, registeredUsers);
-    if (!user) {
-      // Genérico por seguridad: no revelamos si el email existe o no
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+
+    if (error) {
+      // Supabase devuelve un error genérico para email o contraseña
+      // incorrectos. Lo mapeamos al código genérico: por seguridad NO
+      // revelamos si el email existe o no (igual que en el mock).
       return { success: false, errorCode: "loginInvalidCredentials" };
     }
 
-    setCurrentUser(user);
+    // El listener onAuthStateChange actualizará user/isAuthenticated solo.
     return { success: true };
   };
 
   const register = async (data: RegisterInput): Promise<AuthResult> => {
     const { email, password, firstName, lastName } = data;
 
-    // Validación básica de presencia
     if (!email.trim() || !password || !firstName.trim() || !lastName.trim()) {
       return { success: false, errorCode: "registerEmptyFields" };
     }
 
-    // Validación de contraseña según PASSWORD_RULES
+    // Validamos la contraseña con las MISMAS reglas de siempre (8+ caracteres,
+    // una mayúscula, un número) ANTES de mandarla a Supabase.
     if (!isPasswordValid(password)) {
       return { success: false, errorCode: "registerInvalidPassword" };
     }
 
-    // Email no duplicado (case-insensitive)
-    const existing = findUserByEmail(email, registeredUsers);
-    if (existing) {
-      return { success: false, errorCode: "registerEmailTaken" };
+    const { error } = await supabase.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password,
+      options: {
+        // Estos datos quedan en user_metadata; el trigger de la base los copia
+        // a la tabla `profiles`.
+        data: {
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+        },
+      },
+    });
+
+    if (error) {
+      // Con la confirmación de correo DESACTIVADA, registrar un email que ya
+      // existe devuelve un error de "usuario ya registrado".
+      const msg = error.message.toLowerCase();
+      if (msg.includes("already") || msg.includes("registered")) {
+        return { success: false, errorCode: "registerEmailTaken" };
+      }
+      // Cualquier otro rechazo de Supabase (por ejemplo, su propia política de
+      // contraseñas) lo tratamos como contraseña inválida.
+      return { success: false, errorCode: "registerInvalidPassword" };
     }
 
-    // Crear usuario nuevo
-    const newUser: MockUserCredentials = {
-      id: `user-${Date.now().toString(36)}${Math.random()
-        .toString(36)
-        .substring(2, 6)}`,
-      email: email.trim().toLowerCase(),
-      password, // ⚠️ Texto plano — solo simulación
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      createdAt: new Date().toISOString(),
-    };
+    // Con la confirmación desactivada, signUp deja al usuario logueado al
+    // instante; onAuthStateChange actualizará el estado automáticamente.
+    return { success: true };
+  };
 
-    addRegisteredUser(newUser);
-    setCurrentUser(stripPassword(newUser));
+  const logout = async (): Promise<void> => {
+    await supabase.auth.signOut();
+    // onAuthStateChange pondrá user en null automáticamente.
+  };
+
+  const updateProfile = async (
+    firstName: string,
+    lastName: string,
+  ): Promise<AuthResult> => {
+    const fn = firstName.trim();
+    const ln = lastName.trim();
+    if (!fn || !ln) {
+      return { success: false, errorCode: "profileEmptyFields" };
+    }
+
+    // 1) Actualiza los metadatos del usuario en Supabase (desde el cliente).
+    //    Esto dispara USER_UPDATED en onAuthStateChange, que refresca `user`
+    //    al instante en la UI (el nombre cambia sin recargar).
+    const { error } = await supabase.auth.updateUser({
+      data: { firstName: fn, lastName: ln },
+    });
+    if (error) {
+      return { success: false, errorCode: "profileUpdateFailed" };
+    }
+
+    // 2) Sincroniza la tabla `profiles` (servidor). El nombre ya cambió en la
+    //    sesión (paso 1); si esto falla, lo registramos pero no bloqueamos.
+    try {
+      await updateMyProfile(fn, ln);
+    } catch (e) {
+      console.error("No se pudo sincronizar el perfil en la base:", e);
+    }
 
     return { success: true };
   };
 
   return {
-    isAuthenticated: currentUser !== null,
-    requiresAuth: currentUser === null,
-    user: currentUser,
+    isAuthenticated: user !== null,
+    // requiresAuth solo es true cuando YA sabemos que no hay sesión. Durante la
+    // primera carga (isLoading) lo dejamos en false para no redirigir por error
+    // a un usuario que sí está logueado.
+    requiresAuth: !isLoading && user === null,
+    isLoading,
+    user,
     login,
     register,
-    logout: storeLogout,
+    logout,
+    updateProfile,
   };
 }

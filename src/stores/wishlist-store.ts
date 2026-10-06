@@ -1,116 +1,103 @@
 /**
  * ============================================================================
- * WISHLIST STORE — KATALINA
+ * WISHLIST STORE — MKATALINA (Fase 13 · Etapa 3: caché de la base de datos)
  * ============================================================================
  *
- * Store de Zustand para wishlists. A diferencia del cart-store (un solo
- * carrito por navegador), las wishlists son POR-USUARIO:
+ * QUÉ CAMBIÓ RESPECTO A LA VERSIÓN ANTERIOR
+ * -----------------------------------------
+ * Antes: guardaba TODAS las wishlists de todos los usuarios en localStorage
+ *        (un mapa userId → slugs), porque no había base de datos.
  *
- *   {
- *     "user-mock-001": ["aretes-camelia", "collar-luna-llena"],
- *     "user-mock-002": ["pulsera-dalia"],
- *     "user-new-xyz": []
- *   }
+ * Ahora: la fuente de verdad es la BASE DE DATOS. Este store se convierte en
+ *        una simple CACHÉ EN MEMORIA de la wishlist del usuario ACTUAL (solo
+ *        sus slugs). Ya NO persiste en localStorage: en cada carga del sitio,
+ *        el hook la rellena desde la base. Persistir aquí solo crearía datos
+ *        desactualizados que podrían chocar con la base.
  *
- * Por qué guardar todas las wishlists juntas en lugar de cambiar de "store"
- * según el usuario:
- *   - Un solo middleware persist es más simple
- *   - Si el usuario A cierra sesión, sus items siguen ahí para cuando
- *     vuelva a iniciar (UX esperada)
- *   - Si el usuario B inicia sesión en el mismo navegador, ve SUS items,
- *     no los de A (correcto)
+ * POR QUÉ SEGUIR USANDO UN STORE (y no estado local del hook)
+ * -----------------------------------------------------------
+ * El corazón de wishlist aparece en MUCHOS lugares a la vez (cada tarjeta de
+ * producto, la página de wishlist, etc.). Todos esos usos necesitan ver la
+ * MISMA lista y mantenerse sincronizados: si marcas un corazón en una tarjeta,
+ * el conteo y las demás vistas deben reflejarlo al instante. Un store compartido
+ * (singleton) resuelve eso de forma natural.
  *
- * Acceso a wishlists desde la UI:
- *   El hook useWishlist mira el usuario actual (de auth-store), obtiene
- *   los items de ese userId, y los expone. Las mutaciones siempre se
- *   asocian al usuario actual.
- *
- * Si no hay sesión, todas las operaciones devuelven o no-op:
- *   - has() → false siempre
- *   - itemCount → 0
- *   - add()/remove() → no hacen nada (la UI debe redirigir a login antes)
- *
- * Llave de localStorage: 'katalina-wishlist-v1'
- *
- * En Fase 12 con backend:
- *   - Las wishlists viven en una tabla `wishlists` con FK al usuario
- *   - El store se reemplaza por queries al backend (TanStack Query)
- *   - El hook useWishlist mantiene la misma API
+ * EL "STATUS" Y EL GUARD DE CARGA
+ * -------------------------------
+ * Como muchos componentes usan el hook, todos intentarían cargar la wishlist
+ * desde la base al mismo tiempo. Para traerla UNA SOLA VEZ, el store lleva un
+ * `status` y la función beginLoad() actúa como cerrojo atómico: solo el primero
+ * que la llame obtiene `true` y hace la petición; los demás obtienen `false`.
  * ============================================================================
  */
 
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
 
 /**
- * WishlistState — el store interno.
- *
- * `wishlistsByUserId` es el mapa principal. Las funciones reciben userId
- * explícito (en lugar de leer del auth-store directamente) porque eso
- * mantiene este store puro y testeable. El hook useWishlist es quien
- * inyecta el userId actual.
+ * Estados posibles de la caché:
+ *   - "unloaded": aún no se ha traído nada de la base (estado inicial).
+ *   - "loading" : se está trayendo ahora mismo.
+ *   - "loaded"  : ya se trajo; `slugs` es confiable.
  */
+type WishlistStatus = "unloaded" | "loading" | "loaded";
+
 interface WishlistState {
-  /** Mapa userId → array de slugs */
-  wishlistsByUserId: Record<string, string[]>;
+  /** Slugs de la wishlist del usuario actual, del más reciente al más antiguo. */
+  slugs: string[];
+  /** En qué punto de la carga desde la base estamos. */
+  status: WishlistStatus;
 
-  /** Agrega un slug a la wishlist del userId */
-  addToWishlist: (userId: string, slug: string) => void;
+  /**
+   * Cerrojo atómico: si el estado era "unloaded", lo pasa a "loading" y
+   * devuelve true (este llamador debe hacer la petición). Si ya estaba
+   * cargando o cargado, devuelve false (otro ya se encargó).
+   */
+  beginLoad: () => boolean;
 
-  /** Quita un slug de la wishlist del userId */
-  removeFromWishlist: (userId: string, slug: string) => void;
+  /** Guarda la lista traída de la base y marca la caché como "loaded". */
+  finishLoad: (slugs: string[]) => void;
 
-  /** Limpia la wishlist completa de un userId */
-  clearWishlist: (userId: string) => void;
+  /** Agrega un slug de forma optimista (sin duplicar). */
+  addSlug: (slug: string) => void;
+
+  /** Quita un slug de forma optimista. */
+  removeSlug: (slug: string) => void;
+
+  /** Reinicia la caché (al cerrar sesión). */
+  reset: () => void;
 }
 
-export const useWishlistStore = create<WishlistState>()(
-  persist(
-    (set) => ({
-      wishlistsByUserId: {},
+export const useWishlistStore = create<WishlistState>()((set, get) => ({
+  slugs: [],
+  status: "unloaded",
 
-      addToWishlist: (userId, slug) => {
-        set((state) => {
-          // Obtener la wishlist actual del usuario, o array vacío si no existe
-          const currentList = state.wishlistsByUserId[userId] ?? [];
+  beginLoad: () => {
+    // Lectura del estado EN VIVO (get()), no de una copia vieja, para que el
+    // cerrojo sea confiable aunque varios componentes lo llamen a la vez.
+    if (get().status !== "unloaded") return false;
+    set({ status: "loading" });
+    return true;
+  },
 
-          // Si ya está, no hacer nada (no duplicar)
-          if (currentList.includes(slug)) return state;
+  finishLoad: (slugs) => set({ slugs, status: "loaded" }),
 
-          // Agregar al inicio (los más recientes arriba)
-          return {
-            wishlistsByUserId: {
-              ...state.wishlistsByUserId,
-              [userId]: [slug, ...currentList],
-            },
-          };
-        });
-      },
+  addSlug: (slug) =>
+    set((state) =>
+      state.slugs.includes(slug)
+        ? state // ya está: no duplicar
+        : { slugs: [slug, ...state.slugs] },
+    ),
 
-      removeFromWishlist: (userId, slug) => {
-        set((state) => {
-          const currentList = state.wishlistsByUserId[userId] ?? [];
-          return {
-            wishlistsByUserId: {
-              ...state.wishlistsByUserId,
-              [userId]: currentList.filter((s) => s !== slug),
-            },
-          };
-        });
-      },
+  removeSlug: (slug) =>
+    set((state) => ({ slugs: state.slugs.filter((s) => s !== slug) })),
 
-      clearWishlist: (userId) => {
-        set((state) => ({
-          wishlistsByUserId: {
-            ...state.wishlistsByUserId,
-            [userId]: [],
-          },
-        }));
-      },
-    }),
-    {
-      name: "katalina-wishlist-v1",
-      storage: createJSONStorage(() => localStorage),
-    }
-  )
-);
+  reset: () =>
+    set((state) =>
+      // Si ya está limpio, devolvemos el MISMO estado: así Zustand no notifica
+      // ni provoca un re-render innecesario (evita churn cuando muchas
+      // instancias del hook llaman reset sin que nada haya cambiado).
+      state.status === "unloaded" && state.slugs.length === 0
+        ? state
+        : { slugs: [], status: "unloaded" },
+    ),
+}));

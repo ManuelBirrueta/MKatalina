@@ -1,22 +1,25 @@
 /**
  * ============================================================================
- * PAGE: /[locale]/pulseras — MKATALINA (rebrand: openGraph actualizado)
+ * PAGE: /[locale]/aretes — MKATALINA
  * ============================================================================
  *
- * Cambio respecto a la versión anterior:
- *   - openGraph.title: "${categoryTitle} · Katalina" → "${categoryTitle} · MKatalina"
+ * CORRECCIÓN (Fase 13): este archivo tenía TODO el contenido de "Pulseras" por
+ * un copiar-pegar, y por eso /aretes mostraba brazaletes. Se corrigió cada
+ * referencia para que apunte a la categoría correcta ("Aretes") y a la ruta
+ * "/aretes". El bug visible lo causaba getProductsByCategory("Pulseras");
+ * las demás correcciones arreglan el título, la descripción SEO, las URLs
+ * para compartir y los datos estructurados.
  *
- * Lo que NO cambia:
- *   - generateMetadata async para metadata bilingüe
- *   - params como Promise<{ locale }> en Next.js 15+
- *   - Structured data (BreadcrumbList + ItemList) con labels traducidos
- *   - CategoryPage simplificado a una sola línea
+ * Qué hace esta página:
+ *   - generateMetadata async: metadata bilingüe (título + descripción para SEO)
+ *   - params como Promise<{ locale }> (patrón de Next.js 15+)
+ *   - Structured data (BreadcrumbList + ItemList) con textos traducidos
+ *   - Renderiza <CategoryPage category="Aretes" />, el componente compartido
+ *     que trae los productos de la categoría y pinta la cuadrícula, filtros,
+ *     orden y paginación.
  *
- * El openGraph.title aparece cuando alguien comparte la URL de esta página
- * en WhatsApp, Twitter, Facebook, etc. Antes mostraba "Aretes · Katalina",
- * ahora muestra "Aretes · MKatalina".
- *
- * Ver aretes/page.tsx para comentarios extensos sobre el patrón general.
+ * El openGraph.title es lo que se ve cuando alguien comparte la URL de esta
+ * página en WhatsApp, Facebook, etc.
  * ============================================================================
  */
 
@@ -44,29 +47,29 @@ export async function generateMetadata({
     namespace: "catalog",
   });
 
-  const categoryTitle = tProduct("categories.Pulseras");
-  const metaDescription = tCatalog("metaDescriptions.Pulseras");
+  // Título y descripción de la categoría ARETES, traducidos según el idioma.
+  const categoryTitle = tProduct("categories.Aretes");
+  const metaDescription = tCatalog("metaDescriptions.Aretes");
 
   return {
     title: categoryTitle,
     description: metaDescription,
     alternates: {
-      canonical: absoluteUrl("/pulseras"),
+      canonical: absoluteUrl("/aretes"),
     },
     openGraph: {
       /**
-       * Usamos SITE_NAME importado de lib/seo.ts (ya rebrandeado a "MKatalina")
-       * en lugar de hardcodear el nombre. Esto garantiza que si en el futuro
-       * cambia de nuevo el nombre, solo se actualiza en un lugar.
+       * SITE_NAME viene de lib/seo.ts (ya rebrandeado a "MKatalina"), así el
+       * nombre de marca se mantiene en un solo lugar.
        */
       title: `${categoryTitle} · ${SITE_NAME}`,
       description: metaDescription,
-      url: absoluteUrl("/pulseras"),
+      url: absoluteUrl("/aretes"),
     },
   };
 }
 
-export default async function PulserasPage() {
+export default async function AretesPage() {
   const locale = await getLocale();
   const tProduct = await getTranslations({
     locale,
@@ -77,16 +80,19 @@ export default async function PulserasPage() {
     namespace: "breadcrumb",
   });
 
-  const products = getProductsByCategory("Pulseras");
+  // Trae los 6 productos cuya categoría es "Aretes" (esta era la línea del bug).
+  const products = getProductsByCategory("Aretes");
 
   const homeLabel = tBreadcrumb("home");
-  const categoryTitle = tProduct("categories.Pulseras");
+  const categoryTitle = tProduct("categories.Aretes");
 
+  // Migas de pan para SEO: Inicio → Aretes.
   const breadcrumbJsonLd = breadcrumbSchema([
     { name: homeLabel, url: SITE_URL },
-    { name: categoryTitle, url: absoluteUrl("/pulseras") },
+    { name: categoryTitle, url: absoluteUrl("/aretes") },
   ]);
 
+  // Lista de productos en formato de datos estructurados (para buscadores).
   const itemListJsonLd = itemListSchema(products, categoryTitle);
 
   return (
@@ -94,7 +100,7 @@ export default async function PulserasPage() {
       <JsonLd data={breadcrumbJsonLd} />
       <JsonLd data={itemListJsonLd} />
 
-      <CategoryPage category="Pulseras" />
+      <CategoryPage category="Aretes" />
     </>
   );
 }

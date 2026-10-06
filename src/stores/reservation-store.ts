@@ -1,129 +1,78 @@
 /**
  * ============================================================================
- * RESERVATION STORE — KATALINA
+ * RESERVATION STORE — MKATALINA (Fase 13 · Etapa 3: caché de la base de datos)
  * ============================================================================
  *
- * Store de Zustand para apartados de productos.
+ * Igual que con la wishlist: antes guardaba TODOS los apartados de todos los
+ * usuarios en localStorage; ahora la fuente de verdad es la BASE DE DATOS y
+ * este store es solo una CACHÉ EN MEMORIA de los apartados del usuario actual.
+ * Ya NO persiste en localStorage.
  *
- * Estructura: igual que wishlist-store, los apartados son POR-USUARIO:
- *
- *   {
- *     "user-mock-001": [reservation1, reservation2],
- *     "user-mock-002": [reservation3]
- *   }
- *
- * Por qué guardar todas las reservaciones juntas:
- *   - Misma razón que wishlist: si el usuario A cierra sesión, sus
- *     apartados siguen ahí cuando vuelva
- *   - Si el usuario B inicia sesión en el mismo navegador, solo ve los suyos
- *
- * Acciones expuestas:
- *   - createReservation: crea un apartado nuevo
- *   - completeReservation: marca como completed (paga el restante)
- *   - cancelReservation: marca como cancelled
- *
- * Nota: NO hay acción "expireReservation" porque la expiración se calcula
- * dinámicamente al renderizar (ver getEffectiveStatus en types/reservation.ts).
- *
- * En Fase 12 con backend:
- *   - Tabla reservations con FK al usuario y al producto
- *   - Endpoint POST /api/reservations crea con validación de stock
- *   - Cron job marca como expired las que pasaron 5 días sin pago
- *   - El producto se "bloquea" durante el apartado vía product_stock_holds
+ * El `status` + beginLoad() son el mismo cerrojo atómico de la wishlist, para
+ * traer los apartados de la base UNA sola vez aunque varios componentes usen
+ * el hook a la vez.
  * ============================================================================
  */
 
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
-import type { Reservation, DeliveryMethod } from "@/types/reservation";
+import type { Reservation } from "@/types/reservation";
+
+type CacheStatus = "unloaded" | "loading" | "loaded";
 
 interface ReservationState {
-  /** Mapa userId → array de reservaciones */
-  reservationsByUserId: Record<string, Reservation[]>;
+  /** Apartados del usuario actual (más reciente primero). */
+  reservations: Reservation[];
+  /** En qué punto de la carga desde la base estamos. */
+  status: CacheStatus;
 
-  /**
-   * Crear un apartado nuevo. Lo agrega al array del usuario.
-   *
-   * El ID se genera al llamar esta acción (no se pasa como parámetro)
-   * para garantizar unicidad. Mismo patrón que en cart-store con los items.
-   */
-  createReservation: (userId: string, reservation: Reservation) => void;
+  /** Cerrojo atómico: devuelve true solo al primero que carga. */
+  beginLoad: () => boolean;
+  /** Guarda los apartados traídos de la base y marca "loaded". */
+  finishLoad: (reservations: Reservation[]) => void;
 
-  /**
-   * Completar el pago de un apartado. Lo marca como "completed" y guarda
-   * el método de entrega elegido.
-   */
-  completeReservation: (
-    userId: string,
-    reservationId: string,
-    deliveryMethod: DeliveryMethod
-  ) => void;
+  /** Agrega un apartado al inicio (optimista, al crear). */
+  addReservation: (reservation: Reservation) => void;
+  /** Quita un apartado por id (para revertir un create fallido). */
+  removeReservation: (id: string) => void;
+  /** Reemplaza un apartado por su id (para completar/cancelar y sus rollbacks). */
+  replaceReservation: (reservation: Reservation) => void;
 
-  /**
-   * Cancelar un apartado voluntariamente.
-   * El anticipo NO se devuelve (regla del negocio).
-   */
-  cancelReservation: (userId: string, reservationId: string) => void;
+  /** Reinicia la caché (al cerrar sesión). Idempotente. */
+  reset: () => void;
 }
 
-export const useReservationStore = create<ReservationState>()(
-  persist(
-    (set) => ({
-      reservationsByUserId: {},
+export const useReservationStore = create<ReservationState>()((set, get) => ({
+  reservations: [],
+  status: "unloaded",
 
-      createReservation: (userId, reservation) => {
-        set((state) => {
-          const currentList = state.reservationsByUserId[userId] ?? [];
-          return {
-            reservationsByUserId: {
-              ...state.reservationsByUserId,
-              // Nuevos apartados al inicio (más reciente primero)
-              [userId]: [reservation, ...currentList],
-            },
-          };
-        });
-      },
+  beginLoad: () => {
+    if (get().status !== "unloaded") return false;
+    set({ status: "loading" });
+    return true;
+  },
 
-      completeReservation: (userId, reservationId, deliveryMethod) => {
-        set((state) => {
-          const currentList = state.reservationsByUserId[userId] ?? [];
-          return {
-            reservationsByUserId: {
-              ...state.reservationsByUserId,
-              [userId]: currentList.map((r) =>
-                r.id === reservationId
-                  ? {
-                      ...r,
-                      status: "completed" as const,
-                      deliveryMethod,
-                      completedAt: new Date().toISOString(),
-                    }
-                  : r
-              ),
-            },
-          };
-        });
-      },
+  finishLoad: (reservations) => set({ reservations, status: "loaded" }),
 
-      cancelReservation: (userId, reservationId) => {
-        set((state) => {
-          const currentList = state.reservationsByUserId[userId] ?? [];
-          return {
-            reservationsByUserId: {
-              ...state.reservationsByUserId,
-              [userId]: currentList.map((r) =>
-                r.id === reservationId
-                  ? { ...r, status: "cancelled" as const }
-                  : r
-              ),
-            },
-          };
-        });
-      },
-    }),
-    {
-      name: "katalina-reservations-v1",
-      storage: createJSONStorage(() => localStorage),
-    }
-  )
-);
+  addReservation: (reservation) =>
+    set((state) => ({ reservations: [reservation, ...state.reservations] })),
+
+  removeReservation: (id) =>
+    set((state) => ({
+      reservations: state.reservations.filter((r) => r.id !== id),
+    })),
+
+  replaceReservation: (reservation) =>
+    set((state) => ({
+      reservations: state.reservations.map((r) =>
+        r.id === reservation.id ? reservation : r,
+      ),
+    })),
+
+  reset: () =>
+    set((state) =>
+      // Si ya está limpio, no re-renderizar (evita churn entre instancias).
+      state.status === "unloaded" && state.reservations.length === 0
+        ? state
+        : { reservations: [], status: "unloaded" },
+    ),
+}));

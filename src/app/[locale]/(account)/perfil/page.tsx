@@ -1,37 +1,21 @@
 /**
  * ============================================================================
- * PAGE: /[locale]/(account)/perfil — KATALINA (Fase 12 Turno 3B.3: bilingüe)
+ * PAGE: /[locale]/(account)/perfil — MKATALINA (Fase 13 · Etapa 3)
  * ============================================================================
  *
- * Cambios respecto a la versión anterior:
- *   - useLocale + useTranslations agregados con namespace profile
- *   - Todos los textos hardcoded traducidos:
- *     * Header (título + subtítulo)
- *     * Sección "Datos personales" (heading, labels, botones, errores, toast)
- *     * Sección "Seguridad" (heading, password info, botón, toast pending)
- *     * Sección "Zona de peligro" (heading, eliminar cuenta, botón, toast)
- *   - Date formatting de "Miembro desde" con locale dinámico
- *   - Validación de "Mínimo 2 caracteres" desde messages.json
+ * Cambio de la Fase 13:
+ *   - Antes, guardar el perfil llamaba a setCurrentUser del auth-store viejo
+ *     (desconectado de la sesión real), por eso el cambio NO persistía.
+ *   - Ahora guardar llama a useAuth().updateProfile, que actualiza los
+ *     metadatos del usuario en Supabase (refresca la UI al instante) y
+ *     sincroniza la tabla profiles. Ya persiste de verdad.
+ *   - Se eliminó el import de useAuthStore.
  *
  * Lo que NO cambia:
- *   - Lógica de edit/save/cancel
- *   - Validación de length (sigue siendo >= 2)
- *   - setCurrentUser del auth store
- *   - Email read-only
- *   - Botones de cambiar password / eliminar cuenta siguen siendo
- *     placeholders que muestran toast info
- *
- * ─── SOBRE LA VALIDACIÓN ─────────────────────────────────────────────────
- *
- * Validación de "mínimo 2 caracteres" hardcoded. Si quisieras hacer la
- * regla configurable (ej. mínimo 3 en producción), podrías pasar el
- * número en el mensaje: errorMinChars: "Mínimo {count} caracteres" e
- * interpolarlo con count: MIN_CHARS.
- *
- * Por ahora lo dejo como mensaje fijo "Mínimo 2 caracteres" porque ese
- * número está hardcoded en la lógica también. Si cambias uno, cambia
- * el otro.
- * ─────────────────────────────────────────────────────────────────────────
+ *   - Toda la parte visual (secciones, inputs, botones)
+ *   - La validación de "mínimo 2 caracteres"
+ *   - Email de solo lectura; botones de contraseña / eliminar cuenta siguen
+ *     siendo placeholders (toast info)
  * ============================================================================
  */
 
@@ -42,7 +26,6 @@ import { useLocale, useTranslations } from "next-intl";
 import { Pencil, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { useAuthStore } from "@/stores/auth-store";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Locale } from "@/i18n/routing";
@@ -51,16 +34,11 @@ export default function ProfilePage() {
   const locale = useLocale() as Locale;
   const t = useTranslations("profile");
 
-  const { user } = useAuth();
-
-  /**
-   * Acceso directo a setCurrentUser del store.
-   * No exponemos esto en useAuth porque es admin-like.
-   */
-  const setCurrentUser = useAuthStore((state) => state.setCurrentUser);
+  const { user, updateProfile } = useAuth();
 
   // Estado del formulario de edición
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [firstName, setFirstName] = useState(user?.firstName ?? "");
   const [lastName, setLastName] = useState(user?.lastName ?? "");
   const [errors, setErrors] = useState<{
@@ -73,8 +51,6 @@ export default function ProfilePage() {
 
   /**
    * Formatear "Miembro desde" según el locale activo.
-   *   - es → "1 de mayo de 2026"
-   *   - en → "May 1, 2026"
    */
   const intlLocale = locale === "es" ? "es-MX" : "en-US";
   const memberSince = new Intl.DateTimeFormat(intlLocale, {
@@ -97,9 +73,8 @@ export default function ProfilePage() {
     setIsEditing(false);
   };
 
-  const saveChanges = () => {
+  const saveChanges = async () => {
     const newErrors: typeof errors = {};
-    // Mensaje de error desde namespace traducido
     const errorMsg = t("personalData.errorMinChars");
 
     if (!firstName.trim() || firstName.trim().length < 2) {
@@ -114,18 +89,20 @@ export default function ProfilePage() {
       return;
     }
 
-    // Aplicar cambios al store
-    setCurrentUser({
-      ...user,
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-    });
+    // Guardar de verdad: metadatos de Supabase + tabla profiles.
+    setIsSaving(true);
+    const result = await updateProfile(firstName, lastName);
+    setIsSaving(false);
 
-    toast.success(t("personalData.toastSuccessTitle"), {
-      description: t("personalData.toastSuccessDescription"),
-    });
-
-    setIsEditing(false);
+    if (result.success) {
+      toast.success(t("personalData.toastSuccessTitle"), {
+        description: t("personalData.toastSuccessDescription"),
+      });
+      setIsEditing(false);
+    } else {
+      // Falló el guardado: dejamos el modo edición abierto para reintentar.
+      console.error("No se pudo actualizar el perfil:", result.errorCode);
+    }
   };
 
   return (
@@ -142,7 +119,7 @@ export default function ProfilePage() {
       <section
         className={cn(
           "border border-border rounded-md p-6 bg-card",
-          "space-y-6"
+          "space-y-6",
         )}
         aria-labelledby="personal-data-heading"
       >
@@ -190,7 +167,7 @@ export default function ProfilePage() {
                     "focus:outline-none transition-colors",
                     errors.firstName
                       ? "border-destructive"
-                      : "border-input focus:border-ring"
+                      : "border-input focus:border-ring",
                   )}
                   autoFocus
                 />
@@ -226,7 +203,7 @@ export default function ProfilePage() {
                     "focus:outline-none transition-colors",
                     errors.lastName
                       ? "border-destructive"
-                      : "border-input focus:border-ring"
+                      : "border-input focus:border-ring",
                   )}
                 />
                 {errors.lastName && (
@@ -263,11 +240,16 @@ export default function ProfilePage() {
         {/* Botones de acción en modo edición */}
         {isEditing && (
           <div className="flex gap-3 pt-2 border-t border-border">
-            <Button onClick={saveChanges} className="gap-2">
+            <Button onClick={saveChanges} disabled={isSaving} className="gap-2">
               <Check className="h-4 w-4" />
               {t("personalData.saveButton")}
             </Button>
-            <Button onClick={cancelEditing} variant="outline" className="gap-2">
+            <Button
+              onClick={cancelEditing}
+              disabled={isSaving}
+              variant="outline"
+              className="gap-2"
+            >
               <X className="h-4 w-4" />
               {t("personalData.cancelButton")}
             </Button>
@@ -312,7 +294,7 @@ export default function ProfilePage() {
       <section
         className={cn(
           "border border-destructive/30 rounded-md p-6",
-          "bg-destructive/5 space-y-4"
+          "bg-destructive/5 space-y-4",
         )}
         aria-labelledby="danger-heading"
       >
