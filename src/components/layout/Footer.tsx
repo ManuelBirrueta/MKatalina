@@ -1,41 +1,19 @@
 /**
  * ============================================================================
- * FOOTER — MKATALINA (rebrand: URLs sociales actualizadas)
+ * FOOTER — MKATALINA (Fase 13: logo completo en el footer)
  * ============================================================================
  *
- * Cambios respecto a la versión anterior:
- *   - URLs hardcoded de redes sociales:
- *     * https://instagram.com/katalina.mx → https://instagram.com/mkatalina.mx
- *     * https://facebook.com/katalina.mx → https://facebook.com/mkatalina.mx
+ * Cambio de esta etapa:
+ *   - El logo del footer ahora usa la variante "full" (arete + "Maria Katalina"
+ *     + "collection") a tamaño xl, para que se vea completo y legible. Se quitó
+ *     withTagline ("Joyería artesanal"), porque el logo completo ya trae
+ *     "collection" debajo; la frase descriptiva del footer (párrafo) se queda.
+ *   - Como el footer tiene fondo oscuro, el logo (fill=currentColor) sale claro
+ *     automáticamente.
  *
  * Lo que NO cambia:
- *   - Estructura del footer (newsletter, columnas, línea legal)
- *   - El newsletter (con NewsletterForm)
- *   - footerColumns array (links a categorías y páginas)
- *   - Los SVG inline de Instagram y Facebook
- *   - Métodos de pago
- *   - El copyright con interpolación (lee siteName desde messages.json,
- *     que ya está rebrandeada a "MKatalina" desde el Turno 1)
- *
- * ─── COMENTARIO IMPORTANTE ─────────────────────────────────────────────
- *
- * El copyright NO tiene "Katalina" hardcoded aquí. El texto se construye
- * con interpolación:
- *
- *   tFooter("copyright", {
- *     year: currentYear,
- *     siteName: t("common.siteName"),  ← viene de messages.json
- *   })
- *
- * Como messages.json ya tiene siteName: "MKatalina" desde el Turno 1, el
- * copyright muestra automáticamente "© 2026 MKatalina. Todos los derechos
- * reservados.".
- *
- * Misma cosa para el tagline ("MKatalina nace en..." → ya viene de messages
- * desde el Turno 1).
- *
- * Por lo tanto, en este archivo SOLO necesitamos cambiar los 2 socialLinks.
- * ─────────────────────────────────────────────────────────────────────────
+ *   - Estructura (newsletter, columnas, línea legal), redes sociales,
+ *     métodos de pago, copyright con interpolación (siteName desde messages).
  * ============================================================================
  */
 
@@ -109,10 +87,7 @@ function FacebookIcon({ className }: { className?: string }) {
 }
 
 /**
- * URLs sociales actualizadas al rebrand.
- *
- * Si los handles cambian en producción (ej. Instagram no permite
- * @mkatalina.mx por longitud), las URLs aquí deben actualizarse.
+ * URLs sociales. Si los handles cambian en producción, actualízalos aquí.
  */
 const socialLinks = [
   {
@@ -160,7 +135,9 @@ export async function Footer() {
         {/* ═══════ SECCIÓN 2: COLUMNAS DE LINKS ═══════ */}
         <div className="py-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           <div className="space-y-4">
-            <Logo size="md" withTagline />
+            {/* Logo completo (arete + script + "collection"), tamaño amplio.
+                En fondo oscuro sale claro por currentColor. */}
+            <Logo size="xl" variant="full" />
             <p className="text-sm text-primary-foreground/60 max-w-xs">
               {tFooter("tagline")}
             </p>
@@ -179,7 +156,7 @@ export async function Footer() {
                       className={cn(
                         "text-sm",
                         "text-primary-foreground/70",
-                        "hover:text-accent transition-colors duration-200"
+                        "hover:text-accent transition-colors duration-200",
                       )}
                     >
                       {tNav(link.labelKey)}
@@ -197,14 +174,10 @@ export async function Footer() {
             "py-6 border-t border-primary-foreground/10",
             "flex flex-col items-center gap-4",
             "md:flex-row md:items-center md:justify-between",
-            "text-xs text-primary-foreground/60"
+            "text-xs text-primary-foreground/60",
           )}
         >
-          {/*
-           * Copyright con interpolación.
-           * siteName viene de messages.json (ya rebrandeada a "MKatalina"
-           * desde el Turno 1 del rebrand).
-           */}
+          {/* Copyright con interpolación (siteName desde messages.json). */}
           <p className="text-center md:text-left">
             {tFooter("copyright", {
               year: currentYear,
@@ -213,7 +186,7 @@ export async function Footer() {
           </p>
 
           <div className="flex flex-col items-center gap-3 md:flex-row md:gap-6">
-            {/* Redes sociales con URLs actualizadas al rebrand */}
+            {/* Redes sociales */}
             <div className="flex items-center gap-2">
               {socialLinks.map((social) => {
                 const Icon = social.Icon;
@@ -228,7 +201,7 @@ export async function Footer() {
                       "h-9 w-9 rounded-full",
                       "flex items-center justify-center",
                       "text-primary-foreground/60 hover:text-accent",
-                      "transition-colors"
+                      "transition-colors",
                     )}
                   >
                     <Icon className="h-4 w-4" />

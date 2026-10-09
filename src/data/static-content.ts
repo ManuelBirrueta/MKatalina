@@ -440,178 +440,460 @@ export const contactContent = {
   },
 };
 
-/* ─── POLÍTICAS (Turno 3C: traducido + disclaimer en /en) ─────────────── */
-/**
- * Contenido placeholder. Necesita EXPANSIÓN antes de producción
- * (ver advertencia crítica al inicio de este archivo).
- */
+
+/* ════════════════════════════════════════════════════════════════════════════
+ *  BLOQUE LEGAL — MKATALINA  ·  COMPLETO (es + en)
+ * ────────────────────────────────────────────────────────────────────────────
+ *  Reemplaza los TRES objetos legales (policiesContent, privacyContent,
+ *  termsContent) en src/data/static-content.ts — entre contactContent y faqContent.
+ *
+ *  Ya está TODO rellenado: responsable, domicilio, jurisdicción y plazos.
+ *  Reutiliza ENGLISH_LEGAL_DISCLAIMER y LegalSection (ya definidos arriba).
+ *
+ *  ⚠️ No soy abogado: sigue siendo un borrador conviene que revise un profesional,
+ *     sobre todo el Aviso de Privacidad. Ajusta los plazos si usas otros.
+ * ════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── POLÍTICAS (envíos, apartados, devoluciones, garantías) ───────────────── */
 export const policiesContent = {
   hero: {
-    eyebrow: {
-      es: "Políticas",
-      en: "Policies",
-    },
+    eyebrow: { es: "Políticas", en: "Policies" },
     title: {
-      es: "Envíos, devoluciones y garantías",
-      en: "Shipping, returns and warranties",
+      es: "Envíos, apartados, devoluciones y garantías",
+      en: "Shipping, reservations, returns and warranties",
     },
     subtitle: {
-      es: "Todo lo que necesitas saber sobre cómo manejamos tu pedido desde el carrito hasta tu casa.",
-      en: "Everything you need to know about how we handle your order from cart to home.",
+      es: "Todo lo que necesitas saber sobre cómo manejamos tu pedido, desde el carrito hasta tu casa.",
+      en: "Everything you need to know about how we handle your order, from cart to home.",
     },
   },
   lastUpdated: {
-    es: "1 de mayo de 2026",
-    en: "May 1, 2026",
+    es: "6 de octubre de 2026",
+    en: "October 6, 2026",
   },
   sections: [
     {
       id: "envios",
-      title: {
-        es: "Envíos",
-        en: "Shipping",
-      },
+      title: { es: "Envíos", en: "Shipping" },
       paragraphs: {
         es: [
-          "Enviamos a toda la República Mexicana. Los pedidos se procesan en un plazo de 1 a 2 días hábiles después de confirmado el pago.",
-          "El tiempo de entrega varía según el método de envío elegido: el envío estándar tarda entre 3 y 5 días hábiles.",
-          "Por ahora no realizamos envíos internacionales. Estamos trabajando en habilitar esta opción próximamente.",
+          "Enviamos a toda la República Mexicana a través de paqueterías de cobertura nacional. Los pedidos se procesan en un plazo de 1 a 2 días hábiles después de confirmado el pago; los apartados se procesan una vez cubierto el total.",
+          "El tiempo estimado de entrega del envío estándar es de 3 a 5 días hábiles una vez despachado el pedido. Los tiempos pueden variar por zona, temporada alta o causas ajenas a nosotros, como el clima o retrasos de la paquetería.",
+          "El costo de envío se calcula y se muestra en el checkout antes de que pagues.",
+          "Cuando tu pedido sale de nuestro taller te enviamos por correo el número de guía para que lo rastrees. Por ahora no realizamos envíos internacionales.",
         ],
-        /**
-         * Primera sección de /en: el disclaimer va como primer párrafo,
-         * seguido de los párrafos traducidos. Esta es la única sección con
-         * disclaimer en este documento — las siguientes solo tienen contenido.
-         */
         en: [
           ENGLISH_LEGAL_DISCLAIMER,
-          "We ship throughout Mexico. Orders are processed within 1 to 2 business days after payment confirmation.",
-          "Delivery time varies depending on the shipping method chosen: standard shipping takes between 3 and 5 business days.",
-          "We do not currently offer international shipping. We are working on enabling this option soon.",
+          "We ship throughout Mexico via national couriers. Orders are processed within 1 to 2 business days after payment confirmation; reservations are processed once the total has been paid.",
+          "The estimated delivery time for standard shipping is 3 to 5 business days after the order is dispatched. Times may vary by region, peak season, or causes beyond our control, such as weather or courier delays.",
+          "The shipping cost is calculated and shown at checkout before you pay.",
+          "When your order leaves our workshop, we email you the tracking number so you can follow it. We do not currently offer international shipping.",
+        ],
+      },
+    },
+    {
+      id: "apartados",
+      title: { es: "Apartados", en: "Reservations" },
+      paragraphs: {
+        es: [
+          "Puedes apartar una pieza pagando un anticipo del 20% de su precio total. El 80% restante debe cubrirse dentro de los 5 días naturales siguientes.",
+          "Durante esos 5 días la pieza queda reservada para ti. Al completar el pago eliges si la recoges en tienda o la recibes por envío, aplicando los tiempos y costos de la sección de Envíos.",
+          "El anticipo del 20% no es reembolsable bajo ninguna circunstancia, incluyendo la cancelación voluntaria o el vencimiento del apartado. Si no completas el pago en el plazo, el apartado se cancela y la pieza vuelve a estar disponible.",
+        ],
+        en: [
+          "You can reserve a piece by paying a 20% deposit of its total price. The remaining 80% must be paid within the following 5 calendar days.",
+          "During those 5 days the piece is held for you. When you complete the payment you choose whether to pick it up in store or receive it by shipping, subject to the times and costs in the Shipping section.",
+          "The 20% deposit is non-refundable under any circumstances, including voluntary cancellation or expiration of the reservation. If you do not complete the payment in time, the reservation is cancelled and the piece becomes available again.",
         ],
       },
     },
     {
       id: "devoluciones",
-      title: {
-        es: "Devoluciones y cambios",
-        en: "Returns and exchanges",
-      },
+      title: { es: "Devoluciones y cambios", en: "Returns and exchanges" },
       paragraphs: {
         es: [
-          "Aceptamos devoluciones dentro de los 30 días posteriores a la fecha de entrega.",
-          "Para iniciar una devolución, escríbenos a hola@mkatalina.mx indicando tu número de pedido.",
+          "Aceptamos devoluciones y cambios dentro de los 30 días naturales posteriores a la fecha de entrega, siempre que la pieza esté sin uso, en su empaque original y con sus etiquetas.",
+          "Por razones de higiene, los aretes no admiten devolución ni cambio, salvo defecto de fábrica. Las piezas personalizadas o grabadas tampoco son retornables, por tratarse de productos hechos a pedido.",
+          "Para iniciar una devolución o cambio, escríbenos a hola@mkatalina.mx indicando tu número de pedido y el motivo. Te daremos los pasos a seguir.",
+          "El costo del envío de retorno corre por cuenta del cliente, salvo que la devolución se deba a un error nuestro o a un defecto de fábrica.",
+          "Una vez que recibimos y revisamos la pieza, procesamos el reembolso al mismo método de pago en un plazo de 5 a 10 días hábiles, o realizamos el cambio acordado.",
         ],
         en: [
-          "We accept returns within 30 days following the delivery date.",
-          "To start a return, write to us at hola@mkatalina.mx indicating your order number.",
+          "We accept returns and exchanges within 30 calendar days following the delivery date, provided the piece is unused, in its original packaging and with its tags.",
+          "For hygiene reasons, earrings cannot be returned or exchanged, except for manufacturing defects. Personalized or engraved pieces are also non-returnable, as they are made to order.",
+          "To start a return or exchange, write to us at hola@mkatalina.mx with your order number and the reason. We will guide you through the steps.",
+          "Return shipping costs are covered by the customer, unless the return is due to our error or a manufacturing defect.",
+          "Once we receive and inspect the piece, we process the refund to the original payment method within 5 to 10 business days, or carry out the agreed exchange.",
+        ],
+      },
+    },
+    {
+      id: "garantias",
+      title: { es: "Garantías", en: "Warranties" },
+      paragraphs: {
+        es: [
+          "Todas nuestras piezas cuentan con una garantía de 30 días por defectos de fabricación. Si tu pieza presenta una falla de origen, la reparamos o reemplazamos sin costo.",
+          "La garantía no cubre el desgaste natural por el uso, el oscurecimiento propio de la plata, golpes, humedad, el contacto con perfumes o químicos, ni el mal uso de la pieza.",
+          "Para hacer válida la garantía, escríbenos a hola@mkatalina.mx con tu número de pedido y fotografías de la pieza.",
+        ],
+        en: [
+          "All our pieces come with a 30-day warranty against manufacturing defects. If your piece has a defect from origin, we repair or replace it at no cost.",
+          "The warranty does not cover natural wear from use, the natural tarnishing of silver, impacts, moisture, contact with perfumes or chemicals, or misuse of the piece.",
+          "To claim the warranty, write to us at hola@mkatalina.mx with your order number and photos of the piece.",
         ],
       },
     },
   ] satisfies LegalSection[],
 };
 
-/* ─── PRIVACIDAD (Turno 3C: traducido + disclaimer en /en) ────────────── */
-/**
- * Contenido placeholder. Necesita EXPANSIÓN COMPLETA antes de producción.
- * Faltan: datos recopilados, finalidades, derechos ARCO, cookies, etc.
- * (ver advertencia crítica al inicio de este archivo).
- */
+/* ─── AVISO DE PRIVACIDAD (LFPDPPP) ───────────────────────────────────────── */
 export const privacyContent = {
   hero: {
-    eyebrow: {
-      es: "Privacidad",
-      en: "Privacy",
-    },
+    eyebrow: { es: "Privacidad", en: "Privacy" },
     title: {
-      es: "Cómo cuidamos tus datos",
-      en: "How we care for your data",
+      es: "Aviso de privacidad",
+      en: "Privacy notice",
     },
     subtitle: {
-      es: "Te explicamos qué información guardamos, por qué la necesitamos y cómo la protegemos.",
-      en: "We explain what information we keep, why we need it, and how we protect it.",
+      es: "Te explicamos qué datos recabamos, para qué los usamos, con quién se comparten y cómo los proteges.",
+      en: "We explain what data we collect, what we use it for, who it is shared with, and how we protect it.",
     },
   },
   lastUpdated: {
-    es: "1 de mayo de 2026",
-    en: "May 1, 2026",
+    es: "6 de octubre de 2026",
+    en: "October 6, 2026",
   },
   sections: [
     {
-      id: "introduccion",
+      id: "responsable",
       title: {
-        es: "Quiénes somos y cómo contactarnos",
-        en: "Who we are and how to contact us",
+        es: "Responsable y cómo contactarnos",
+        en: "Data controller and how to contact us",
       },
       paragraphs: {
         es: [
-          "MKatalina es responsable del tratamiento de tus datos personales. Operamos en México y cumplimos con la LFPDPPP.",
+          "En cumplimiento de la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP), te informamos cómo tratamos tus datos personales.",
+          "El responsable del tratamiento de tus datos es María Guadalupe Rubio Sandoval, con domicilio en Andalucía 15, Fraccionamiento Mediterráneo, Mazatlán, Sinaloa. Para cualquier asunto relacionado con tus datos personales puedes contactarnos en hola@mkatalina.mx.",
         ],
-        /**
-         * Primera (y única) sección de /en: disclaimer + párrafo traducido.
-         * Nota: "LFPDPPP" se mantiene en español porque es el nombre oficial
-         * de la ley mexicana — no se traduce. Se podría expandir a
-         * "Mexican Federal Law on Protection of Personal Data Held by Private
-         * Parties (LFPDPPP)" cuando el contenido se expanda en producción.
-         */
         en: [
           ENGLISH_LEGAL_DISCLAIMER,
-          "MKatalina is responsible for the processing of your personal data. We operate in Mexico and comply with the LFPDPPP (Mexican Federal Law on Protection of Personal Data Held by Private Parties).",
+          "In compliance with the Mexican Federal Law on Protection of Personal Data Held by Private Parties (LFPDPPP), we inform you how we process your personal data.",
+          "The party responsible for processing your data is María Guadalupe Rubio Sandoval, with address at Andalucía 15, Fraccionamiento Mediterráneo, Mazatlán, Sinaloa. For any matter related to your personal data you may contact us at hola@mkatalina.mx.",
+        ],
+      },
+    },
+    {
+      id: "datos",
+      title: {
+        es: "Datos que recabamos",
+        en: "Data we collect",
+      },
+      paragraphs: {
+        es: [
+          "Para operar la tienda recabamos, según el caso, datos de identificación y contacto (nombre, correo electrónico y teléfono); datos de envío (domicilio, colonia, ciudad, estado y código postal); y datos de tu cuenta (correo y una contraseña, que se almacena de forma cifrada).",
+          "Cuando realizas un pedido o un apartado, guardamos el historial de la transacción: productos, montos, dirección de envío y estado del pedido.",
+          "No almacenamos los datos de tu tarjeta. Los pagos se procesan directamente por nuestro proveedor de pagos (PayPal), que recibe y resguarda esa información conforme a sus propias políticas.",
+          "También podemos recabar datos de navegación, como las páginas que visitas, mediante cookies y tecnologías similares, con fines de funcionamiento y mejora del sitio.",
+        ],
+        en: [
+          "To operate the store we collect, as applicable, identification and contact data (name, email and phone); shipping data (address, neighborhood, city, state and postal code); and account data (email and a password, stored in encrypted form).",
+          "When you place an order or a reservation, we keep the transaction history: products, amounts, shipping address and order status.",
+          "We do not store your card details. Payments are processed directly by our payment provider (PayPal), which receives and safeguards that information according to its own policies.",
+          "We may also collect browsing data, such as the pages you visit, through cookies and similar technologies, for site functioning and improvement.",
+        ],
+      },
+    },
+    {
+      id: "finalidades",
+      title: {
+        es: "Para qué usamos tus datos",
+        en: "What we use your data for",
+      },
+      paragraphs: {
+        es: [
+          "Finalidades primarias, necesarias para darte el servicio: procesar y entregar tus pedidos y apartados; gestionar tu cuenta; brindarte atención y soporte; y cumplir obligaciones legales y fiscales.",
+          "Finalidades secundarias, que no son necesarias y requieren tu consentimiento: enviarte comunicaciones comerciales, promociones y novedades (newsletter).",
+          "Si no deseas que tus datos se usen para las finalidades secundarias, puedes manifestarlo en cualquier momento escribiendo a hola@mkatalina.mx. Negarte a estas finalidades no afecta la prestación del servicio.",
+        ],
+        en: [
+          "Primary purposes, necessary to provide the service: process and deliver your orders and reservations; manage your account; provide customer care and support; and comply with legal and tax obligations.",
+          "Secondary purposes, which are not necessary and require your consent: sending you commercial communications, promotions and news (newsletter).",
+          "If you do not want your data used for secondary purposes, you may say so at any time by writing to hola@mkatalina.mx. Declining these purposes does not affect the service.",
+        ],
+      },
+    },
+    {
+      id: "transferencias",
+      title: {
+        es: "Con quién se comparten (encargados)",
+        en: "Who it is shared with (processors)",
+      },
+      paragraphs: {
+        es: [
+          "Para operar, compartimos ciertos datos con proveedores que nos prestan servicios (encargados), únicamente para las finalidades descritas: el procesador de pagos (PayPal), el proveedor de infraestructura y base de datos (Supabase) y las empresas de paquetería para la entrega de tus pedidos.",
+          "Algunos de estos proveedores pueden almacenar o procesar información en servidores ubicados fuera de México. En esos casos tomamos medidas para que tus datos sigan protegidos conforme a este aviso.",
+          "No vendemos ni rentamos tus datos personales a terceros.",
+        ],
+        en: [
+          "To operate, we share certain data with providers that render services to us (processors), solely for the purposes described: the payment processor (PayPal), the infrastructure and database provider (Supabase), and courier companies for the delivery of your orders.",
+          "Some of these providers may store or process information on servers located outside Mexico. In those cases we take measures so that your data remains protected under this notice.",
+          "We do not sell or rent your personal data to third parties.",
+        ],
+      },
+    },
+    {
+      id: "arco",
+      title: {
+        es: "Tus derechos ARCO",
+        en: "Your ARCO rights",
+      },
+      paragraphs: {
+        es: [
+          "Tienes derecho a Acceder a tus datos, Rectificarlos cuando sean inexactos, Cancelarlos cuando consideres que no se requieren, y Oponerte a su tratamiento (derechos ARCO). También puedes revocar el consentimiento que nos hayas otorgado.",
+          "Para ejercer cualquiera de estos derechos, envía tu solicitud a hola@mkatalina.mx indicando tu nombre, el derecho que deseas ejercer y los datos sobre los que recae. Podremos solicitarte una identificación para verificar tu identidad.",
+          "Te responderemos dentro de los plazos que marca la ley.",
+        ],
+        en: [
+          "You have the right to Access your data, Rectify it when inaccurate, Cancel it when you consider it is not needed, and Object to its processing (ARCO rights). You may also revoke any consent you have given us.",
+          "To exercise any of these rights, send your request to hola@mkatalina.mx stating your name, the right you wish to exercise, and the data it concerns. We may ask for an ID to verify your identity.",
+          "We will respond within the time frames established by law.",
+        ],
+      },
+    },
+    {
+      id: "cookies",
+      title: {
+        es: "Cookies y tecnologías similares",
+        en: "Cookies and similar technologies",
+      },
+      paragraphs: {
+        es: [
+          "Usamos cookies y almacenamiento local del navegador para recordar tu sesión, mantener tu carrito y mejorar tu experiencia. Algunas son necesarias para que el sitio funcione; otras nos ayudan a entender cómo se usa el sitio.",
+          "Puedes configurar tu navegador para rechazar o eliminar cookies, pero algunas funciones del sitio podrían dejar de operar correctamente.",
+        ],
+        en: [
+          "We use cookies and browser local storage to remember your session, keep your cart, and improve your experience. Some are necessary for the site to work; others help us understand how the site is used.",
+          "You can set your browser to reject or delete cookies, but some site features may stop working correctly.",
+        ],
+      },
+    },
+    {
+      id: "seguridad",
+      title: {
+        es: "Cómo protegemos tus datos",
+        en: "How we protect your data",
+      },
+      paragraphs: {
+        es: [
+          "Aplicamos medidas de seguridad administrativas, técnicas y físicas razonables para proteger tus datos contra pérdida, uso indebido o acceso no autorizado. Las contraseñas se almacenan cifradas y el acceso a los datos está restringido.",
+          "Ningún sistema es completamente infalible; en caso de una vulneración que afecte tus datos de forma significativa, te lo informaremos conforme a la ley.",
+        ],
+        en: [
+          "We apply reasonable administrative, technical and physical security measures to protect your data against loss, misuse or unauthorized access. Passwords are stored encrypted and access to data is restricted.",
+          "No system is completely infallible; in the event of a breach that significantly affects your data, we will inform you as required by law.",
+        ],
+      },
+    },
+    {
+      id: "cambios",
+      title: {
+        es: "Cambios a este aviso",
+        en: "Changes to this notice",
+      },
+      paragraphs: {
+        es: [
+          "Podemos actualizar este aviso de privacidad para reflejar cambios en nuestras prácticas o en la ley. Publicaremos la versión vigente en esta página e indicaremos la fecha de última actualización.",
+        ],
+        en: [
+          "We may update this privacy notice to reflect changes in our practices or in the law. We will publish the current version on this page and indicate the date of last update.",
         ],
       },
     },
   ] satisfies LegalSection[],
 };
 
-/* ─── TÉRMINOS (Turno 3C: traducido + disclaimer en /en) ──────────────── */
-/**
- * Contenido placeholder. Necesita EXPANSIÓN COMPLETA antes de producción.
- * Faltan: uso del sitio, cuenta de usuario, propiedad intelectual, etc.
- * (ver advertencia crítica al inicio de este archivo).
- */
+/* ─── TÉRMINOS Y CONDICIONES ──────────────────────────────────────────────── */
 export const termsContent = {
   hero: {
-    eyebrow: {
+    eyebrow: { es: "Términos y condiciones", en: "Terms and conditions" },
+    title: {
       es: "Términos y condiciones",
       en: "Terms and conditions",
     },
-    title: {
-      es: "Las reglas del juego",
-      en: "The rules of the game",
-    },
     subtitle: {
-      es: "Al usar MKatalina aceptas estos términos. Los escribimos en español claro, no en jerga legal.",
-      /**
-       * Corregido de "plain English" a "plain language" — la traducción
-       * literal "We wrote them in plain English" no tenía sentido lógico
-       * (los términos están en lenguaje claro, no específicamente en inglés).
-       * "Plain language" preserva la intención del original.
-       */
+      es: "Al usar MKatalina aceptas estos términos. Los escribimos en lenguaje claro, no en jerga legal.",
       en: "By using MKatalina you accept these terms. We wrote them in plain language, not in legal jargon.",
     },
   },
   lastUpdated: {
-    es: "1 de mayo de 2026",
-    en: "May 1, 2026",
+    es: "6 de octubre de 2026",
+    en: "October 6, 2026",
   },
   sections: [
     {
       id: "aceptacion",
-      title: {
-        es: "Aceptación de los términos",
-        en: "Acceptance of terms",
-      },
+      title: { es: "Aceptación de los términos", en: "Acceptance of terms" },
       paragraphs: {
         es: [
-          "Al acceder al sitio web de MKatalina y realizar cualquier interacción, aceptas estos términos y condiciones en su totalidad.",
+          "Al acceder y usar el sitio de MKatalina aceptas estos Términos y Condiciones en su totalidad. Si no estás de acuerdo con ellos, te pedimos no utilizar el sitio.",
         ],
         en: [
           ENGLISH_LEGAL_DISCLAIMER,
-          "By accessing MKatalina's website and engaging in any interaction, you accept these terms and conditions in their entirety.",
+          "By accessing and using the MKatalina website you accept these Terms and Conditions in their entirety. If you do not agree with them, please do not use the site.",
+        ],
+      },
+    },
+    {
+      id: "uso",
+      title: { es: "Uso del sitio", en: "Use of the site" },
+      paragraphs: {
+        es: [
+          "Puedes usar el sitio para conocer y adquirir nuestros productos de forma personal y lícita.",
+          "Te comprometes a no usar el sitio para fines fraudulentos o ilegales, a no intentar dañar o vulnerar su funcionamiento, y a no reproducir su contenido sin autorización.",
+        ],
+        en: [
+          "You may use the site to browse and purchase our products for personal and lawful purposes.",
+          "You agree not to use the site for fraudulent or illegal purposes, not to attempt to damage or compromise its operation, and not to reproduce its content without authorization.",
+        ],
+      },
+    },
+    {
+      id: "cuenta",
+      title: { es: "Cuenta de usuario", en: "User account" },
+      paragraphs: {
+        es: [
+          "Puedes comprar como invitado o crear una cuenta. Al crear una cuenta eres responsable de la veracidad de tus datos y de mantener la confidencialidad de tu contraseña.",
+          "Eres responsable de la actividad que ocurra en tu cuenta. Podemos suspender o cancelar cuentas que incumplan estos términos o que detectemos involucradas en un uso indebido.",
+        ],
+        en: [
+          "You can shop as a guest or create an account. When creating an account you are responsible for the accuracy of your data and for keeping your password confidential.",
+          "You are responsible for activity that occurs in your account. We may suspend or cancel accounts that breach these terms or that we detect involved in misuse.",
+        ],
+      },
+    },
+    {
+      id: "productos",
+      title: { es: "Productos y precios", en: "Products and prices" },
+      paragraphs: {
+        es: [
+          "Procuramos que las descripciones, fotografías y precios sean exactos. Al tratarse de piezas artesanales, pueden existir ligeras variaciones de color, textura o acabado entre la imagen y la pieza física.",
+          "Los precios se muestran en pesos mexicanos (MXN) e incluyen los impuestos aplicables, salvo que se indique lo contrario. El costo de envío se muestra por separado en el checkout.",
+          "Nos reservamos el derecho de corregir errores de precio o de descripción, y de limitar las cantidades según las existencias disponibles. Si un error afecta tu pedido, te contactaremos antes de procesarlo.",
+        ],
+        en: [
+          "We strive to keep descriptions, photographs and prices accurate. As these are handmade pieces, there may be slight variations in color, texture or finish between the image and the physical piece.",
+          "Prices are shown in Mexican pesos (MXN) and include applicable taxes, unless otherwise stated. The shipping cost is shown separately at checkout.",
+          "We reserve the right to correct pricing or description errors, and to limit quantities based on available stock. If an error affects your order, we will contact you before processing it.",
+        ],
+      },
+    },
+    {
+      id: "pagos",
+      title: { es: "Pagos", en: "Payments" },
+      paragraphs: {
+        es: [
+          "Los pagos se procesan a través de nuestro proveedor de pagos (PayPal), que admite el pago con cuenta PayPal o con tarjeta. El cargo se realiza al confirmar la compra.",
+          "Tu pedido se considera confirmado una vez que recibimos la confirmación del pago.",
+        ],
+        en: [
+          "Payments are processed through our payment provider (PayPal), which supports payment with a PayPal account or card. The charge is made upon confirming the purchase.",
+          "Your order is considered confirmed once we receive payment confirmation.",
+        ],
+      },
+    },
+    {
+      id: "apartados",
+      title: { es: "Apartados", en: "Reservations" },
+      paragraphs: {
+        es: [
+          "El servicio de apartado te permite reservar una pieza pagando un anticipo del 20% de su precio total, cubriendo el 80% restante dentro de los 5 días naturales siguientes.",
+          "El anticipo no es reembolsable. Si no se completa el pago en el plazo, el apartado se cancela y la pieza vuelve a estar disponible. Consulta el detalle en nuestras Políticas.",
+        ],
+        en: [
+          "The reservation service lets you hold a piece by paying a 20% deposit of its total price, paying the remaining 80% within the following 5 calendar days.",
+          "The deposit is non-refundable. If payment is not completed in time, the reservation is cancelled and the piece becomes available again. See the details in our Policies.",
+        ],
+      },
+    },
+    {
+      id: "envios-devoluciones",
+      title: {
+        es: "Envíos, devoluciones y garantías",
+        en: "Shipping, returns and warranties",
+      },
+      paragraphs: {
+        es: [
+          "Los envíos, devoluciones, cambios y garantías se rigen por lo establecido en nuestras Políticas, que forman parte de estos términos.",
+        ],
+        en: [
+          "Shipping, returns, exchanges and warranties are governed by our Policies, which form part of these terms.",
+        ],
+      },
+    },
+    {
+      id: "propiedad",
+      title: { es: "Propiedad intelectual", en: "Intellectual property" },
+      paragraphs: {
+        es: [
+          "La marca MKatalina, su logotipo, sus diseños, textos, fotografías y demás contenido del sitio son propiedad de María Guadalupe Rubio Sandoval o se usan con autorización, y están protegidos por las leyes de propiedad intelectual.",
+          "No está permitido copiar, reproducir, distribuir ni usar comercialmente dicho contenido sin nuestro consentimiento por escrito.",
+        ],
+        en: [
+          "The MKatalina brand, its logo, designs, texts, photographs and other site content are owned by María Guadalupe Rubio Sandoval or used with authorization, and are protected by intellectual property laws.",
+          "You may not copy, reproduce, distribute or commercially use such content without our written consent.",
+        ],
+      },
+    },
+    {
+      id: "responsabilidad",
+      title: {
+        es: "Limitación de responsabilidad",
+        en: "Limitation of liability",
+      },
+      paragraphs: {
+        es: [
+          "El sitio y sus productos se ofrecen tal como se describen. En la medida que lo permita la ley, no seremos responsables por daños indirectos o incidentales derivados del uso del sitio ni por retrasos atribuibles a terceros, como las paqueterías o el procesador de pagos.",
+          "Nada en estos términos limita los derechos que te correspondan como consumidor conforme a la legislación aplicable.",
+        ],
+        en: [
+          "The site and its products are offered as described. To the extent permitted by law, we will not be liable for indirect or incidental damages arising from use of the site, nor for delays attributable to third parties such as couriers or the payment processor.",
+          "Nothing in these terms limits the rights you may have as a consumer under applicable law.",
+        ],
+      },
+    },
+    {
+      id: "modificaciones",
+      title: {
+        es: "Modificaciones a los términos",
+        en: "Changes to the terms",
+      },
+      paragraphs: {
+        es: [
+          "Podemos modificar estos términos en cualquier momento. La versión vigente será la publicada en esta página, con su fecha de última actualización. El uso del sitio después de un cambio implica la aceptación de los términos actualizados.",
+        ],
+        en: [
+          "We may modify these terms at any time. The current version will be the one published on this page, with its date of last update. Using the site after a change implies acceptance of the updated terms.",
+        ],
+      },
+    },
+    {
+      id: "jurisdiccion",
+      title: {
+        es: "Legislación y jurisdicción",
+        en: "Governing law and jurisdiction",
+      },
+      paragraphs: {
+        es: [
+          "Estos términos se rigen por las leyes de los Estados Unidos Mexicanos. Para cualquier controversia, las partes se someten a la jurisdicción de los tribunales competentes de Mazatlán, Sinaloa, renunciando a cualquier otro fuero que pudiera corresponderles.",
+        ],
+        en: [
+          "These terms are governed by the laws of the United Mexican States. For any dispute, the parties submit to the jurisdiction of the competent courts of Mazatlán, Sinaloa, waiving any other jurisdiction that may correspond to them.",
         ],
       },
     },
   ] satisfies LegalSection[],
 };
+
 
 /* ─── FAQ (sin cambios respecto al Turno 3A) ──────────────────────────── */
 export const faqContent = {
