@@ -1,11 +1,13 @@
 /**
  * ============================================================================
- * ADDRESS FIELDS — MKATALINA · Fase 13 · Etapa 7
+ * ADDRESS FIELDS — MKATALINA · Fase 13 · Etapa 7 (+ 7.1: banderas)
  * ============================================================================
  *
  * Campos de una dirección de envío INTERNACIONAL, en este orden:
  *   País · Calle y número · Interior · Colonia/Barrio · Código postal ·
  *   Ciudad · Estado/Provincia
+ *
+ * País: selector con bandera y buscador (CountrySelect.tsx, Etapa 7.1).
  *
  * Cómo cambia según el país elegido:
  *   - Colonia: obligatoria en México; en otros países se llama "Barrio /
@@ -30,9 +32,10 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { getCountryOptions, postalCodeRequired } from "@/lib/countries";
+import { postalCodeRequired } from "@/lib/countries";
+import { CountrySelect } from "@/components/shop/CountrySelect";
 import type { AddressField, ShippingAddress } from "@/lib/address";
 import { cn } from "@/lib/utils";
 
@@ -95,7 +98,6 @@ export function AddressFields({
   const copy = COPY[lang];
   const t = useTranslations("checkoutForm");
 
-  const countries = useMemo(() => getCountryOptions(locale), [locale]);
   const isMexico = values.country === "MX";
 
   // "Otro (escribir)": el cliente eligió escribir su estado a mano.
@@ -124,27 +126,21 @@ export function AddressFields({
 
   return (
     <div className="space-y-4">
-      {/* País */}
+      {/* País: bandera + nombre, con buscador (CountrySelect) */}
       <div>
         <label htmlFor={id("country")} className={labelClass}>
           {copy.country}
         </label>
-        <select
+        <CountrySelect
           id={id("country")}
-          autoComplete="shipping country"
           value={values.country}
-          onChange={(e) => {
+          invalid={Boolean(errors.country)}
+          onChange={(code) => {
+            // Nuevo país: se regresa a la lista de estados de ese país.
             setOtherState(false);
-            onChange("country", e.target.value);
+            onChange("country", code);
           }}
-          className={cn(inputClass("country"), "cursor-pointer")}
-        >
-          {countries.map((c) => (
-            <option key={c.code} value={c.code}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+        />
         {errorText("country")}
       </div>
 

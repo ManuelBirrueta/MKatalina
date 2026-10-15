@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * PHONE FIELD — MKATALINA · Fase 13 · Etapa 7
+ * PHONE FIELD — MKATALINA · Fase 13 · Etapa 7 (+ 7.1: banderas)
  * ============================================================================
  *
  * Teléfono internacional: a la izquierda la LADA (selector de país que
@@ -13,10 +13,11 @@
  *     mano (eso lo decide quien usa el componente: checkout y modal de
  *     apartados).
  *
- * TRUCO VISUAL DEL SELECTOR: la lista de países es un <select> normal (así
- * funciona con teclado, lectores de pantalla y en celulares), pero está
- * transparente ENCIMA de una etiqueta que solo dice "+52 ▾". Al tocarlo se
- * abre la lista completa con nombres ("México +52"); cerrado, ocupa poco.
+ * SELECTOR DE LADA (Etapa 7.1): es CountrySelect en su forma "dial".
+ * Cerrado muestra solo la bandera y la lada ("🇲🇽 +52 ▾") para ocupar poco;
+ * abierto muestra el buscador y la lista completa con bandera, nombre y lada
+ * de cada país ("🇪🇸 España  +34"). Antes era un <select> transparente, que
+ * no podía mostrar banderas.
  *
  * Lo usan CheckoutForm.tsx y CompleteReservationModal.tsx.
  * ============================================================================
@@ -24,10 +25,7 @@
 
 "use client";
 
-import { useMemo } from "react";
-import { useLocale } from "next-intl";
-import { ChevronDown } from "lucide-react";
-import { dialCode, getCountryOptions } from "@/lib/countries";
+import { CountrySelect } from "@/components/shop/CountrySelect";
 import { cn } from "@/lib/utils";
 
 export function PhoneField({
@@ -54,10 +52,6 @@ export function PhoneField({
   onPhoneChange: (value: string) => void;
   onBlur?: () => void;
 }) {
-  const locale = useLocale();
-  const options = useMemo(() => getCountryOptions(locale), [locale]);
-  const code = dialCode(phoneCountry);
-
   return (
     <div>
       <label htmlFor={id} className="block text-sm font-medium mb-1.5">
@@ -70,23 +64,13 @@ export function PhoneField({
           error ? "border-destructive" : "border-input",
         )}
       >
-        {/* Lada: etiqueta visible + <select> transparente encima */}
-        <div className="relative flex items-center gap-1 pl-3 pr-2 border-r border-input text-sm tabular-nums">
-          <span>+{code}</span>
-          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-          <select
-            value={phoneCountry}
-            onChange={(e) => onPhoneCountryChange(e.target.value)}
-            aria-label={locale === "en" ? "Country calling code" : "Lada del país"}
-            className="absolute inset-0 w-full opacity-0 cursor-pointer"
-          >
-            {options.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.name} +{c.dial}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Lada: bandera + "+52", abre la lista de países (CountrySelect) */}
+        <CountrySelect
+          id={`${id}-country`}
+          variant="dial"
+          value={phoneCountry}
+          onChange={onPhoneCountryChange}
+        />
         <input
           id={id}
           type="tel"
