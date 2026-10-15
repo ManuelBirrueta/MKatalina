@@ -155,6 +155,10 @@
       "loginInvalidCredentials": "Invalid email or password",
       "registerEmptyFields": "All fields are required",
       "registerInvalidPassword": "Password does not meet the requirements",
+      "registerInvalidEmail": "Please check your email: it doesn't look like a valid address.",
+      "registerRateLimited": "Too many attempts in a row. Wait a few minutes and try again.",
+      "registerNetworkError": "We couldn't reach the server. Check your connection and try again.",
+      "registerServerError": "We couldn't create your account due to a problem on our side. Please try again in a few minutes.",
       "registerEmailTaken": "This email is already registered"
     },
     "validation": {

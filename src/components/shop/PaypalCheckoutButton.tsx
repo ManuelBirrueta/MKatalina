@@ -1,22 +1,33 @@
 /**
  * ============================================================================
- * PAYPAL CHECKOUT BUTTON — MKATALINA · Fase 13 · Etapa 4
+ * PAYPAL CHECKOUT BUTTON — MKATALINA · Fase 13 · Etapas 3C y 7
  * ============================================================================
  *
- * El botón real de PayPal (reemplaza al botón simulado del checkout). Flujo:
+ * El botón real de PayPal del checkout. Flujo:
  *   1. onClick     → valida el formulario; si hay errores, no abre PayPal.
- *   2. createOrder → llama a createPaypalOrder (servidor) y devuelve el id de
- *                    la orden de PayPal.
- *   3. onApprove   → el cliente aprobó: llama a capturePaypalOrder (servidor),
- *                    que cobra y crea el pedido; luego avisa a la página con
- *                    onSuccess(orderId).
+ *   2. createOrder → createPaypalOrder (servidor): verifica disponibilidad y
+ *                    calcula el total con precios de la base.
+ *   3. onApprove   → capturePaypalOrder (servidor): aparta las piezas, cobra
+ *                    y crea el pedido; luego avisa con onSuccess(orderId).
  *
- * DETALLE TÉCNICO: datos siempre frescos sin recargar el botón.
- *   La página del checkout se re-renderiza en cada tecla (cambia el formulario).
- *   Para que el botón de PayPal NO se recargue en cada tecla (lo que se vería
- *   como un parpadeo), guardamos los props en un ref y los callbacks son
- *   estables (useCallback). Así el botón se monta una vez, pero al pagar lee
- *   SIEMPRE los datos más recientes desde el ref.
+ * CAMBIO DE LA ETAPA 3C — MENSAJES CLAROS:
+ *   El servidor ahora dice POR QUÉ no se pudo (sin piezas, pago rechazado…)
+ *   y aquí se muestra ese motivo exacto (src/lib/checkout-errors.ts) en vez
+ *   de un "no se pudo completar el pago" genérico.
+ *
+ *   Detalle técnico: si createOrder falla, PayPal además llama a onError.
+ *   Para no mostrar DOS avisos, createOrder marca handledErrorRef y onError
+ *   se salta su aviso genérico esa vez.
+ *
+ * CAMBIOS DE LA ETAPA 7:
+ *   - Botones en este orden: "Tarjeta de débito o crédito" ARRIBA y PayPal
+ *     abajo (PaypalButtonsStack).
+ *   - createOrder manda el PAÍS de entrega: el envío se cobra según el país
+ *     (src/lib/shipping-rates.ts). El nombre del método ya no se manda: lo
+ *     pone el servidor.
+ *
+ * DATOS SIEMPRE FRESCOS: los props se guardan en un ref y los callbacks son
+ * estables, para que el botón no se recargue en cada tecla del formulario.
  * ============================================================================
  */
 
@@ -25,12 +36,13 @@
 import { useCallback, useMemo, useRef } from "react";
 import {
   PayPalScriptProvider,
-  PayPalButtons,
   type PayPalButtonsComponentProps,
   type ReactPayPalScriptOptions,
 } from "@paypal/react-paypal-js";
+import { PaypalButtonsStack } from "@/components/shop/PaypalButtonsStack";
 import { toast } from "sonner";
 import { createPaypalOrder, capturePaypalOrder } from "@/actions/paypal";
+import { checkoutErrorMessage } from "@/lib/checkout-errors";
 import type { CheckoutFormData, ShippingMethodId } from "@/types/checkout";
 
 export interface PreparedOrderItem {
@@ -44,19 +56,18 @@ export interface PreparedOrderItem {
 interface PaypalCheckoutButtonProps {
   items: PreparedOrderItem[];
   shippingMethodId: ShippingMethodId;
-  shippingLabel: string;
   formData: CheckoutFormData;
   locale: string;
-  /** Valida el formulario antes de abrir PayPal; true si está OK. */
   validate: () => boolean;
-  /** Se llama tras un pago capturado, con el id del pedido creado. */
   onSuccess: (orderId: string) => void;
 }
 
 export function PaypalCheckoutButton(props: PaypalCheckoutButtonProps) {
-  // Ref con los props más recientes (ver nota de la cabecera).
   const propsRef = useRef(props);
   propsRef.current = props;
+
+  // true cuando createOrder ya mostró su propio aviso (evita uno duplicado).
+  const handledErrorRef = useRef(false);
 
   const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
 
@@ -78,9 +89,12 @@ export function PaypalCheckoutButton(props: PaypalCheckoutButtonProps) {
     const res = await createPaypalOrder({
       items: p.items.map((i) => ({ slug: i.slug, quantity: i.quantity })),
       shippingMethodId: p.shippingMethodId,
+      country: p.formData.country,
     });
     if (!res.paypalOrderId) {
-      throw new Error("No se pudo crear la orden de PayPal");
+      handledErrorRef.current = true;
+      toast.error(checkoutErrorMessage(res.error, p.locale));
+      throw new Error(res.error ?? "createPaypalOrder failed");
     }
     return res.paypalOrderId;
   }, []);
@@ -92,24 +106,24 @@ export function PaypalCheckoutButton(props: PaypalCheckoutButtonProps) {
     const res = await capturePaypalOrder(data.orderID, {
       formData: p.formData,
       shippingMethodId: p.shippingMethodId,
-      shippingLabel: p.shippingLabel,
       locale: p.locale,
       items: p.items,
     });
     if (res.success && res.orderId) {
       p.onSuccess(res.orderId);
     } else {
-      toast.error(
-        p.locale === "en"
-          ? "Payment could not be completed."
-          : "No se pudo completar el pago.",
-      );
+      toast.error(checkoutErrorMessage(res.error, p.locale));
     }
   }, []);
 
   const onError = useCallback<
     NonNullable<PayPalButtonsComponentProps["onError"]>
   >((err) => {
+    // Si createOrder ya avisó del motivo, no repetimos un aviso genérico.
+    if (handledErrorRef.current) {
+      handledErrorRef.current = false;
+      return;
+    }
     console.error("PayPal error:", err);
     const p = propsRef.current;
     toast.error(
@@ -119,7 +133,6 @@ export function PaypalCheckoutButton(props: PaypalCheckoutButtonProps) {
     );
   }, []);
 
-  // Sin credenciales no renderizamos el botón (evita un error del SDK).
   if (!clientId) {
     return (
       <p className="text-xs text-destructive">
@@ -130,8 +143,7 @@ export function PaypalCheckoutButton(props: PaypalCheckoutButtonProps) {
 
   return (
     <PayPalScriptProvider options={options}>
-      <PayPalButtons
-        style={{ layout: "vertical", color: "gold", shape: "rect", label: "paypal" }}
+      <PaypalButtonsStack
         onClick={onClick}
         createOrder={createOrder}
         onApprove={onApprove}

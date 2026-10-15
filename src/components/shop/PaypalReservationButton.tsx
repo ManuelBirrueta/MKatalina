@@ -1,18 +1,25 @@
 /**
  * ============================================================================
- * PAYPAL RESERVATION BUTTON — MKATALINA · Fase 13 · Etapa 4
+ * PAYPAL RESERVATION BUTTON — MKATALINA · Fase 13 · Etapas 3C y 7
+ *
+ * Etapa 7: botón de tarjeta ARRIBA y PayPal abajo (PaypalButtonsStack),
+ * igual que en el checkout.
  * ============================================================================
  *
- * Botón real de PayPal para pagar el ANTICIPO de un apartado. Mismo patrón que
- * el botón del checkout:
- *   createOrder → createPaypalReservationOrder (cobra el 20%, calculado en el
- *                 servidor) y devuelve el id de la orden de PayPal.
- *   onApprove   → capturePaypalReservationOrder: captura el anticipo y, si
- *                 quedó completado, crea el apartado en la base; luego avisa
+ * Botón real de PayPal para pagar el ANTICIPO de un apartado:
+ *   createOrder → createPaypalReservationOrder (servidor): exige sesión,
+ *                 verifica que haya una pieza disponible y cobra el 20% del
+ *                 precio vigente de la base.
+ *   onApprove   → capturePaypalReservationOrder: crea el apartado (bloquea la
+ *                 pieza), cobra y, si el cobro falla, lo deshace; luego avisa
  *                 con onSuccess(reservationId).
  *
- * Muestra PayPal + tarjeta (sin fundingSource). Usa ref para datos frescos y
- * callbacks estables (no recarga el botón innecesariamente).
+ * CAMBIO DE LA ETAPA 3C: muestra el motivo exacto cuando no se puede apartar
+ * (pieza ya apartada o agotada, sesión vencida, pago rechazado…), con los
+ * mismos textos que el checkout (src/lib/checkout-errors.ts). Igual que en el
+ * checkout, handledErrorRef evita un segundo aviso genérico de onError.
+ *
+ * Muestra PayPal + tarjeta. Usa ref para datos frescos y callbacks estables.
  * ============================================================================
  */
 
@@ -21,15 +28,16 @@
 import { useCallback, useMemo, useRef } from "react";
 import {
   PayPalScriptProvider,
-  PayPalButtons,
   type PayPalButtonsComponentProps,
   type ReactPayPalScriptOptions,
 } from "@paypal/react-paypal-js";
+import { PaypalButtonsStack } from "@/components/shop/PaypalButtonsStack";
 import { toast } from "sonner";
 import {
   createPaypalReservationOrder,
   capturePaypalReservationOrder,
 } from "@/actions/paypal";
+import { checkoutErrorMessage } from "@/lib/checkout-errors";
 import type { ProductSnapshot } from "@/types/reservation";
 
 interface PaypalReservationButtonProps {
@@ -42,6 +50,9 @@ export function PaypalReservationButton(props: PaypalReservationButtonProps) {
   const propsRef = useRef(props);
   propsRef.current = props;
 
+  // true cuando createOrder ya mostró su propio aviso (evita uno duplicado).
+  const handledErrorRef = useRef(false);
+
   const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
 
   const options = useMemo<ReactPayPalScriptOptions>(
@@ -52,11 +63,14 @@ export function PaypalReservationButton(props: PaypalReservationButtonProps) {
   const createOrder = useCallback<
     NonNullable<PayPalButtonsComponentProps["createOrder"]>
   >(async () => {
+    const p = propsRef.current;
     const res = await createPaypalReservationOrder({
-      slug: propsRef.current.productSnapshot.slug,
+      slug: p.productSnapshot.slug,
     });
     if (!res.paypalOrderId) {
-      throw new Error("No se pudo crear la orden de PayPal");
+      handledErrorRef.current = true;
+      toast.error(checkoutErrorMessage(res.error, p.locale));
+      throw new Error(res.error ?? "createPaypalReservationOrder failed");
     }
     return res.paypalOrderId;
   }, []);
@@ -72,17 +86,17 @@ export function PaypalReservationButton(props: PaypalReservationButtonProps) {
     if (res.success && res.reservationId) {
       p.onSuccess(res.reservationId);
     } else {
-      toast.error(
-        p.locale === "en"
-          ? "Payment could not be completed."
-          : "No se pudo completar el pago.",
-      );
+      toast.error(checkoutErrorMessage(res.error, p.locale));
     }
   }, []);
 
   const onError = useCallback<
     NonNullable<PayPalButtonsComponentProps["onError"]>
   >((err) => {
+    if (handledErrorRef.current) {
+      handledErrorRef.current = false;
+      return;
+    }
     console.error("PayPal error:", err);
     const p = propsRef.current;
     toast.error(
@@ -102,8 +116,7 @@ export function PaypalReservationButton(props: PaypalReservationButtonProps) {
 
   return (
     <PayPalScriptProvider options={options}>
-      <PayPalButtons
-        style={{ layout: "vertical", color: "gold", shape: "rect", label: "paypal" }}
+      <PaypalButtonsStack
         createOrder={createOrder}
         onApprove={onApprove}
         onError={onError}

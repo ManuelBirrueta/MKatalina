@@ -1,51 +1,29 @@
 /**
  * ============================================================================
- * CATEGORY PAGE — KATALINA (Fase 12 Turno 3B.3: bilingüe)
+ * CATEGORY PAGE — MKATALINA (Fase 13 · Etapa 3: productos como prop)
  * ============================================================================
  *
- * Cambios respecto a la versión anterior:
+ * CAMBIO DE ESTA ETAPA:
+ *   - Antes llamaba a getProductsByCategory() de src/data/products.ts por su
+ *     cuenta (productos en código).
+ *   - Ahora RECIBE los productos en la prop `products`. Los lee de la base la
+ *     página de servidor que lo usa (aretes/page.tsx, collares/page.tsx…),
+ *     porque este es un componente de NAVEGADOR ("use client") y el navegador
+ *     no puede consultar la base.
  *
- *   1. FIRMA SIMPLIFICADA (Opción A):
- *      Antes:  <CategoryPage categoryName="Aretes" categoryDescription="..." allProducts={...} />
- *      Ahora:  <CategoryPage category="Aretes" />
+ *   Uso:  <CategoryPage category="Aretes" products={products} />
  *
- *      Todo el contenido editorial (título, descripción, meta) ahora vive en
- *      messages.json bajo `catalog.categoryDescriptions.{Aretes|Collares|...}`.
- *      El componente resuelve internamente título y descripción usando los
- *      hooks de i18n. Las páginas de categoría (aretes/page.tsx, etc.) ahora
- *      son una sola línea: <CategoryPage category="Aretes" />.
- *
- *   2. FIX CRÍTICO DEL SORT POR NOMBRE:
- *      Antes:  a.name.localeCompare(b.name, "es")
- *              → CRASH porque a.name ahora es LocalizedString {es, en}
- *              → "TypeError: a.name.localeCompare is not a function"
- *      Ahora:  getLocalized(a.name, locale).localeCompare(
- *                getLocalized(b.name, locale),
- *                locale === "es" ? "es" : "en"
- *              )
- *              → Resuelve cada nombre al locale activo antes de comparar
- *              → Usa la collation correcta del idioma (orden alfabético
- *                difiere entre idiomas; "ñ" en es, etc.)
- *
- *   3. INTERNACIONALIZACIÓN COMPLETA:
- *      - useLocale + useTranslations agregados
- *      - getProductsByCategory devuelve productos cuyo `category` enum es
- *        en español (ej: "Aretes"). Eso NO cambia — los enums se quedan
- *        en español. Solo las LABELS visibles se traducen via
- *        t("product.categories.Aretes") que devuelve "Aretes" en ES,
- *        "Earrings" en EN.
+ * Lo que NO cambia:
+ *   - Filtros (material, color, precio, solo en stock), orden y paginación,
+ *     todos leídos de la URL.
+ *   - Título y descripción de la categoría desde messages.json.
+ *   - El orden por nombre resuelve cada nombre al idioma activo antes de
+ *     comparar (name es { es, en }).
  *
  * ─── PATRÓN DE DATA ────────────────────────────────────────────────────
- *   Como en TODAS las páginas que usamos hasta ahora, la categoría se
- *   identifica con su ENUM en español ("Aretes", "Collares", "Pulseras",
- *   "Gargantillas"). Estos enums son STABLE — no cambian con el idioma.
- *
- *   La conversión a label visible la hace cada componente cuando lo
- *   necesita vía t("product.categories.{Enum}").
- *
- *   Beneficio: la URL /aretes funciona en ambos idiomas. Los apartados
- *   guardados con category="Aretes" siguen siendo consistentes. La base
- *   de datos algún día también guardará "Aretes", no "Earrings".
+ *   La categoría se identifica con su ENUM en español ("Aretes",
+ *   "Collares", "Pulseras", "Gargantillas"), igual en ambos idiomas. La
+ *   etiqueta visible se traduce con t("product.categories.{Enum}").
  * ============================================================================
  */
 
@@ -62,23 +40,27 @@ import { SortBar } from "@/components/shop/SortBar";
 import { Pagination } from "@/components/shop/Pagination";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { Button } from "@/components/ui/button";
-import { getProductsByCategory } from "@/data/products";
 import { getLocalized } from "@/lib/i18n-helpers";
-import type { ProductCategory } from "@/types/product";
+import type { Product, ProductCategory } from "@/types/product";
 import type { Locale } from "@/i18n/routing";
 
 const PRODUCTS_PER_PAGE = 16;
 
 interface CategoryPageProps {
   /**
-   * Enum en español de la categoría. Es el ÚNICO prop necesario.
-   * Todo lo demás (título visible, descripción, lista de productos) se
-   * resuelve internamente.
+   * Enum en español de la categoría. Se usa para el título y la descripción
+   * visibles (messages.json).
    */
   category: ProductCategory;
+
+  /**
+   * Productos visibles de la categoría, ya leídos de la base por la página
+   * de servidor. Aquí solo se filtran, ordenan y paginan.
+   */
+  products: Product[];
 }
 
-export function CategoryPage({ category }: CategoryPageProps) {
+export function CategoryPage({ category, products }: CategoryPageProps) {
   const locale = useLocale() as Locale;
   const t = useTranslations("catalog");
   const tProduct = useTranslations("product");
@@ -86,22 +68,19 @@ export function CategoryPage({ category }: CategoryPageProps) {
   const searchParams = useSearchParams();
 
   /**
-   * Resolver textos visibles desde messages.json:
-   *   - categoryTitle: el label de la categoría ("Aretes" / "Earrings")
-   *   - categoryDescription: descripción editorial bilingüe
-   *
-   * Ambos viven en namespaces diferentes:
-   *   - product.categories.{Enum} → label corto
-   *   - catalog.categoryDescriptions.{Enum} → descripción larga
+   * Textos visibles desde messages.json:
+   *   - product.categories.{Enum}            → label corto ("Aretes" / "Earrings")
+   *   - catalog.categoryDescriptions.{Enum}  → descripción larga
    */
   const categoryTitle = tProduct(`categories.${category}`);
   const categoryDescription = t(`categoryDescriptions.${category}`);
 
   /**
-   * Obtener todos los productos de esta categoría.
-   * getProductsByCategory busca por el enum en español.
+   * Todos los productos de la categoría (llegan de la base vía prop).
+   * Como la prop no cambia entre renders, los useMemo de abajo no
+   * recalculan de más.
    */
-  const allProducts = getProductsByCategory(category);
+  const allProducts = products;
 
   // Leer estado de la URL (filtros + sort + página)
   const activeMaterials = searchParams.get("material")?.split(",") ?? [];
@@ -114,9 +93,9 @@ export function CategoryPage({ category }: CategoryPageProps) {
 
   /**
    * Paso 1: filtrado.
-   * useMemo evita recalcular si las dependencias no cambian.
-   * Los filtros usan los ENUMS (material, color) que están en español,
-   * por eso no necesitan resolución al locale.
+   * Los filtros usan los ENUMS (material, color) en español, por eso no
+   * necesitan resolución al idioma. `inStock` ya viene calculado del stock
+   * real de la base (stock > 0).
    */
   const filteredProducts = useMemo(() => {
     return allProducts.filter((product) => {
@@ -143,23 +122,9 @@ export function CategoryPage({ category }: CategoryPageProps) {
 
   /**
    * Paso 2: ordenamiento.
-   *
-   * ─── FIX CRÍTICO ────────────────────────────────────────────────────
-   * El case "nombre" antes hacía:
-   *   sorted.sort((a, b) => a.name.localeCompare(b.name, "es"));
-   *
-   * Eso CRASHEA ahora porque a.name es LocalizedString {es, en}, no string.
-   *
-   * Solución:
-   *   1. Resolver cada nombre al locale ACTIVO con getLocalized()
-   *   2. Comparar los strings resueltos
-   *   3. Usar la collation correcta según el locale (es vs en)
-   *
-   * Por qué pasar la collation:
-   *   localeCompare puede dar resultados ligeramente diferentes entre
-   *   idiomas (ej: el orden de la "ñ", el de los acentos). Pasar el
-   *   locale correcto asegura orden alfabético natural en cada idioma.
-   * ─────────────────────────────────────────────────────────────────────
+   * En "nombre", cada nombre se resuelve al idioma activo antes de comparar
+   * (name es { es, en }) y se usa la collation de ese idioma (orden de la
+   * "ñ", acentos, etc.).
    */
   const sortedProducts = useMemo(() => {
     const sorted = [...filteredProducts];
@@ -173,10 +138,8 @@ export function CategoryPage({ category }: CategoryPageProps) {
         break;
       case "nombre":
         sorted.sort((a, b) => {
-          // Resolver cada nombre al locale activo antes de comparar
           const nameA = getLocalized(a.name, locale);
           const nameB = getLocalized(b.name, locale);
-          // Collation: "es" para español, "en" para inglés
           return nameA.localeCompare(nameB, locale === "es" ? "es" : "en");
         });
         break;
@@ -203,17 +166,11 @@ export function CategoryPage({ category }: CategoryPageProps) {
   return (
     <>
       <Container>
-        {/*
-         * Breadcrumb recibe el TÍTULO VISIBLE de la categoría (ya traducido),
-         * no el enum. El componente Breadcrumb es solo de presentación.
-         */}
+        {/* Breadcrumb recibe el título VISIBLE (ya traducido), no el enum. */}
         <Breadcrumb items={[{ label: categoryTitle }]} />
       </Container>
 
-      {/*
-       * CategoryHero recibe los tres datos básicos como strings ya resueltos.
-       * El componente es de presentación pura.
-       */}
+      {/* CategoryHero recibe strings ya resueltos (presentación pura). */}
       <CategoryHero
         name={categoryTitle}
         description={categoryDescription}
@@ -254,7 +211,7 @@ export function CategoryPage({ category }: CategoryPageProps) {
 }
 
 /**
- * NoResults — fallback cuando filtros dejan 0 productos.
+ * NoResults — fallback cuando los filtros dejan 0 productos.
  * Textos traducidos desde catalog.noResults.
  */
 function NoResults() {

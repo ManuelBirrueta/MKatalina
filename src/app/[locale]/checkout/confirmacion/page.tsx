@@ -3,6 +3,18 @@
  * PAGE: /[locale]/checkout/confirmacion — KATALINA (Fase 12 Turno 3B.4 fix)
  * ============================================================================
  *
+ * CAMBIO DE LA ETAPA 7 (Fase 13) — DIRECCIONES INTERNACIONALES:
+ *   La dirección muestra el país, y el teléfono con su lada ("+1 …").
+ *   Los pedidos guardados antes de esta etapa (sin país) se muestran como
+ *   México.
+ *
+ * CAMBIO DE LA ETAPA 6C (Fase 13) — CONFIRMACIÓN DE CORREO:
+ *   GuestAccountPrompt (crear cuenta después de comprar como invitado): con
+ *   la confirmación de correo activada en Supabase, crear la cuenta ya no
+ *   inicia sesión. Si register() responde needsConfirmation = true, se
+ *   muestra el aviso "Revisa tu correo" (CheckEmailNotice) en lugar de
+ *   "¡Cuenta creada!".
+ *
  * Cambios respecto a la versión anterior (Turno 3B.3):
  *   - GuestAccountPrompt actualizado para consumir el nuevo contrato de
  *     useAuth().register() que ahora devuelve `errorCode` en lugar de
@@ -93,7 +105,9 @@ import { Container } from "@/components/layout/Container";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { countryName, dialCode } from "@/lib/countries";
 import { useAuth } from "@/hooks/use-auth";
+import { CheckEmailNotice } from "@/components/auth/CheckEmailNotice";
 import { PASSWORD_RULES } from "@/data/mock-users";
 import { toast } from "sonner";
 import { getLocalizedSafe } from "@/lib/i18n-helpers";
@@ -127,6 +141,9 @@ interface OrderSnapshot {
     state: string;
     postalCode: string;
     notes: string;
+    /** Etapa 7 (ausentes en compras anteriores = México). */
+    country?: string;
+    phoneCountry?: string;
   };
   shippingMethod: {
     id: string;
@@ -281,15 +298,23 @@ function FullConfirmation({ order }: { order: OrderSnapshot }) {
                     {order.formData.addressLine2 &&
                       `, ${order.formData.addressLine2}`}
                   </p>
+                  {order.formData.neighborhood && (
+                    <p className="text-muted-foreground">
+                      {order.formData.neighborhood}
+                    </p>
+                  )}
                   <p className="text-muted-foreground">
-                    {order.formData.neighborhood}
+                    {[order.formData.city, order.formData.state, order.formData.postalCode]
+                      .filter(Boolean)
+                      .join(", ")}
                   </p>
                   <p className="text-muted-foreground">
-                    {order.formData.city}, {order.formData.state}{" "}
-                    {order.formData.postalCode}
+                    {countryName(order.formData.country ?? "MX", locale)}
                   </p>
                   <p className="text-muted-foreground mt-2">
-                    {t("shipping.phoneLabel")} {order.formData.phone}
+                    {t("shipping.phoneLabel")} +
+                    {dialCode(order.formData.phoneCountry ?? order.formData.country ?? "MX")}{" "}
+                    {order.formData.phone}
                   </p>
                 </address>
 
@@ -355,8 +380,21 @@ function GuestAccountPrompt({ order }: { order: OrderSnapshot }) {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [accountCreated, setAccountCreated] = useState(false);
+  // Etapa 6C: cuenta creada pero falta confirmar el correo.
+  const [pendingConfirmation, setPendingConfirmation] = useState(false);
 
   if (isAuthenticated) return null;
+
+  // Etapa 6C: aviso "Revisa tu correo" con botón para reenviar.
+  if (pendingConfirmation) {
+    return (
+      <CheckEmailNotice
+        email={order.formData.email}
+        showLoginLink={false}
+        className="max-w-4xl mx-auto mb-8"
+      />
+    );
+  }
 
   if (accountCreated) {
     return (
@@ -398,7 +436,11 @@ function GuestAccountPrompt({ order }: { order: OrderSnapshot }) {
       lastName: order.formData.lastName,
     });
 
-    if (result.success) {
+    if (result.success && result.needsConfirmation) {
+      // Etapa 6C: falta confirmar el correo.
+      setPendingConfirmation(true);
+      setIsSubmitting(false);
+    } else if (result.success) {
       toast.success(t("toastSuccess"), {
         description: t("toastSuccessDescription", {
           firstName: order.formData.firstName,

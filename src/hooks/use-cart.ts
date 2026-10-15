@@ -1,11 +1,29 @@
 /**
  * ============================================================================
- * USE CART — MKATALINA (Fase 13 · Etapa 3: invitado + base + fusión)
+ * USE CART — MKATALINA (Fase 13 · Etapa 3D: + tope de piezas disponibles)
  * ============================================================================
  *
+ * CAMBIO DE LA ETAPA 3D — LÍMITE DE CANTIDAD:
+ *   - addItem / updateQuantity pasan al store el tope de piezas DISPONIBLES
+ *     del producto (product.stock del catálogo = stock − apartados activos).
+ *     La cantidad nunca pasa de lo que el servidor dejaría pagar.
+ *   - addItem devuelve cuántas piezas agregó de verdad (para avisar si caben
+ *     menos de las pedidas).
+ *   - Cada renglón trae `maxQuantity` (tope) y `exceedsStock` (true si tiene
+ *     más piezas de las disponibles, p. ej. porque alguien compró mientras
+ *     tanto). CartItem lo usa para el "+" y para avisar.
+ *
  * MISMA API de siempre (items, itemCount, uniqueCount, subtotal, isEmpty,
- * addItem, removeItem, updateQuantity, clear) + un `isLoading` nuevo. Por eso
- * la página de carrito, el checkout y el header siguen funcionando.
+ * isLoading, addItem, removeItem, updateQuantity, clear). Por eso la página de
+ * carrito, el checkout y el header siguen funcionando sin cambios.
+ *
+ * CAMBIO DE LA ETAPA 3B:
+ *   - Cada renglón se "enriquece" con su producto (nombre, precio, imagen)
+ *     usando useCatalog() — el catálogo de la base que entrega el layout — en
+ *     lugar de getProductBySlug() de src/data/products.ts.
+ *   - Consecuencia: si un producto del carrito fue RETIRADO desde el panel, ya
+ *     no está en el catálogo y su renglón deja de mostrarse (y no suma al
+ *     total). El checkout volverá a verificarlo en el servidor (Etapa 3C).
  *
  * DÓNDE SE GUARDA EL CARRITO
  * --------------------------
@@ -40,7 +58,8 @@
 import { useEffect } from "react";
 import { useCartStore, type CartItem } from "@/stores/cart-store";
 import { useAuth } from "@/hooks/use-auth";
-import { getProductBySlug } from "@/data/products";
+import { useCatalog } from "@/components/providers/CatalogProvider";
+import { MAX_PER_ITEM } from "@/stores/cart-store";
 import type { Product } from "@/types/product";
 import { getMyCart, saveMyCart, mergeGuestCartIntoDb } from "@/actions/cart";
 
@@ -82,6 +101,10 @@ export interface CartItemWithProduct {
   quantity: number;
   product: Product;
   lineTotal: number;
+  /** Tope de piezas para este renglón: disponibles (máximo 99). */
+  maxQuantity: number;
+  /** true si el renglón tiene más piezas de las que hay disponibles. */
+  exceedsStock: boolean;
 }
 
 interface UseCartReturn {
@@ -92,7 +115,8 @@ interface UseCartReturn {
   isEmpty: boolean;
   /** True mientras el carrito aún se está cargando (base o localStorage). */
   isLoading: boolean;
-  addItem: (slug: string, quantity: number) => void;
+  /** Agrega sin pasar de las disponibles. Devuelve cuántas agregó. */
+  addItem: (slug: string, quantity: number) => number;
   removeItem: (slug: string) => void;
   updateQuantity: (slug: string, quantity: number) => void;
   clear: () => void;
@@ -100,6 +124,9 @@ interface UseCartReturn {
 
 export function useCart(): UseCartReturn {
   const { user, isLoading: authLoading } = useAuth();
+
+  // Catálogo visible (de la base, vía el layout) para enriquecer los renglones.
+  const { getBySlug } = useCatalog();
 
   const rawItems = useCartStore((s) => s.items);
   const syncOwner = useCartStore((s) => s.syncOwner);
@@ -151,16 +178,24 @@ export function useCart(): UseCartReturn {
     }
   };
 
-  const addItem = (slug: string, quantity: number) => {
-    addItemStore(slug, quantity);
-    persist();
+  /** Piezas disponibles de un producto según el catálogo (0 si no está). */
+  const maxFor = (slug: string): number => {
+    const product = getBySlug(slug);
+    if (!product) return 0;
+    return Math.min(MAX_PER_ITEM, product.stock ?? MAX_PER_ITEM);
+  };
+
+  const addItem = (slug: string, quantity: number): number => {
+    const added = addItemStore(slug, quantity, maxFor(slug));
+    if (added > 0) persist(); // si no cupo nada, no hay nada que guardar
+    return added;
   };
   const removeItem = (slug: string) => {
     removeItemStore(slug);
     persist();
   };
   const updateQuantity = (slug: string, quantity: number) => {
-    updateQuantityStore(slug, quantity);
+    updateQuantityStore(slug, quantity, maxFor(slug));
     persist();
   };
   const clear = () => {
@@ -168,16 +203,23 @@ export function useCart(): UseCartReturn {
     persist();
   };
 
-  // --- Enriquecer items con su producto (igual que antes) ---
+  // --- Enriquecer cada renglón con su producto del catálogo ---
+  // Los renglones cuyo producto ya no está visible (retirado) se omiten.
   const items: CartItemWithProduct[] = rawItems
     .map((item) => {
-      const product = getProductBySlug(item.slug);
+      const product = getBySlug(item.slug);
       if (!product) return null;
+      const maxQuantity = Math.min(
+        MAX_PER_ITEM,
+        product.stock ?? MAX_PER_ITEM,
+      );
       return {
         slug: item.slug,
         quantity: item.quantity,
         product,
         lineTotal: product.price * item.quantity,
+        maxQuantity,
+        exceedsStock: item.quantity > maxQuantity,
       };
     })
     .filter((item): item is CartItemWithProduct => item !== null);

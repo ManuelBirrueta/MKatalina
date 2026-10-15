@@ -155,7 +155,11 @@
       "loginInvalidCredentials": "Email o contraseña incorrectos",
       "registerEmptyFields": "Todos los campos son obligatorios",
       "registerInvalidPassword": "La contraseña no cumple los requisitos",
-      "registerEmailTaken": "Este email ya está registrado"
+      "registerEmailTaken": "Este email ya está registrado",
+      "registerInvalidEmail": "Revisa el correo: no parece una dirección válida.",
+      "registerRateLimited": "Demasiados intentos seguidos. Espera unos minutos y vuelve a intentarlo.",
+      "registerNetworkError": "No pudimos conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.",
+      "registerServerError": "No pudimos crear tu cuenta por un problema de nuestro lado. Inténtalo de nuevo en unos minutos."
     },
     "validation": {
       "firstNameRequired": "El nombre es obligatorio",

@@ -3,6 +3,9 @@
  * PRODUCT TYPES — KATALINA (Fase 12 Turno 3B.3: + ProductCategory tipado)
  * ============================================================================
  *
+ * Fase 13 · Etapa 3: se agrega `stock?: number` a Product (ver el campo).
+ * Nada más cambia.
+ *
  * Cambios respecto a la versión anterior:
  *   - Agregado: `export type ProductCategory` como union literal
  *   - Cambiado: `Product.category: string` → `Product.category: ProductCategory`
@@ -170,6 +173,16 @@ export interface Product {
   color: ProductColor;
   inStock: boolean;
   createdAt: string;
+
+  /**
+   * Piezas disponibles (Fase 13 · productos en base de datos).
+   *
+   * OPCIONAL a propósito: los productos que vienen de la base siempre lo
+   * traen, pero src/data/products.ts (que solo usa el script de seed) no lo
+   * tiene, y así no hay que tocar ese archivo. Lo usarán el carrito (cantidad
+   * máxima) y el checkout (verificar existencias) en la Etapa 3.
+   */
+  stock?: number;
 }
 
 /**

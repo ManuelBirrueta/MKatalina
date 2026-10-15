@@ -1,19 +1,27 @@
 /**
  * ============================================================================
- *  MKatalina · Acciones de servidor: PEDIDOS · Fase 13 · Etapa 4
+ *  MKatalina · Acciones de servidor: PEDIDOS (lectura) · Fase 13 · Etapas 3C, 6B y 7
  * ============================================================================
  *
- *  createOrder    → persiste un pedido nuevo (cabecera + renglones).
- *  getMyOrders    → lista los pedidos del usuario actual (para "Mis pedidos").
+ *  getMyOrders  → lista los pedidos del usuario actual (para "Mis pedidos").
+ *  getOrderById → un pedido completo, solo si es del usuario (detalle).
  *
- *  Un pedido es un DOCUMENTO inmutable: guarda copias congeladas (nombre
- *  resuelto al idioma, precio, etiqueta de envío). El pago sigue SIMULADO en
- *  esta etapa (el cobro real con PayPal viene después), por eso el pedido se
- *  crea con estado PAGADO.
+ *  ETAPA 7: getOrderById devuelve también el país de entrega.
  *
- *  SEGURIDAD: el usuario se resuelve SIEMPRE en el servidor. getMyOrders solo
- *  devuelve pedidos del usuario logueado (filtra por profileId). Al crear, los
- *  montos se recalculan desde los precios reales.
+ *  ETAPA 6B: getOrderById devuelve también los datos de envío (paquetería,
+ *  número de guía, fechas de envío y entrega) para mostrarlos en el detalle.
+ *
+ *  CAMBIO DE LA ETAPA 3C — SE ELIMINÓ createOrder:
+ *    Era de la época del pago simulado: creaba un pedido marcado como PAGADO
+ *    sin cobrar nada. El checkout ya no la usaba (los pedidos se crean en
+ *    capturePaypalOrder, src/actions/paypal.ts, ligados al cobro real), pero
+ *    una Server Action es un punto de entrada público: cualquiera podía
+ *    llamarla y crear pedidos "pagados" falsos. Por eso se quitó.
+ *
+ *  SEGURIDAD: el usuario se resuelve SIEMPRE en el servidor. Ambas funciones
+ *  solo devuelven pedidos del usuario logueado (filtran por profileId).
+ *  Un pedido es un DOCUMENTO inmutable: muestra las copias congeladas
+ *  (nombre, precio, envío) guardadas al comprar.
  * ============================================================================
  */
 
@@ -21,32 +29,8 @@
 
 import { prisma } from "@/lib/prisma";
 import { getOptionalUser } from "@/lib/auth";
-import { productsData } from "@/data/products";
-import {
-  SHIPPING_METHOD_PRICES,
-  type ShippingMethodId,
-  type CheckoutFormData,
-} from "@/types/checkout";
 
-// ── Tipos de entrada para crear (no exportados) ──
-interface CreateOrderItemInput {
-  slug: string;
-  quantity: number;
-  nameSnapshot: string;
-  imageSnapshot?: string;
-  categorySnapshot?: string;
-}
-
-interface CreateOrderInput {
-  orderId: string;
-  formData: CheckoutFormData;
-  shippingMethodId: ShippingMethodId;
-  shippingLabel: string;
-  locale: string;
-  items: CreateOrderItemInput[];
-}
-
-// ── Tipos de salida para la lista (no exportados; el page usa ReturnType) ──
+// ── Tipos de salida para la lista (no exportados; la página usa ReturnType) ──
 interface OrderListItem {
   slug: string;
   name: string;
@@ -60,60 +44,6 @@ interface OrderSummary {
   status: string;
   total: number;
   items: OrderListItem[];
-}
-
-/**
- * Crea un pedido en la base (cabecera + renglones). Recalcula montos por
- * seguridad. Asocia al usuario si hay sesión; si no, queda como invitado.
- */
-export async function createOrder(input: CreateOrderInput): Promise<void> {
-  const user = await getOptionalUser();
-
-  const itemsData = input.items.map((item) => {
-    const product = productsData.find((p) => p.slug === item.slug);
-    const unitPrice = product?.price ?? 0;
-    return {
-      productSlug: item.slug,
-      nameSnapshot: item.nameSnapshot,
-      unitPrice,
-      quantity: item.quantity,
-      lineTotal: unitPrice * item.quantity,
-      imageSnapshot: item.imageSnapshot ?? null,
-      categorySnapshot: item.categorySnapshot ?? null,
-    };
-  });
-
-  const subtotal = itemsData.reduce((sum, i) => sum + i.lineTotal, 0);
-  const shippingCost = SHIPPING_METHOD_PRICES[input.shippingMethodId] ?? 0;
-  const total = subtotal + shippingCost;
-
-  const f = input.formData;
-
-  await prisma.order.create({
-    data: {
-      id: input.orderId,
-      profileId: user?.id ?? null,
-      email: f.email,
-      phone: f.phone,
-      firstName: f.firstName,
-      lastName: f.lastName,
-      address: f.address,
-      addressLine2: f.addressLine2 || null,
-      neighborhood: f.neighborhood,
-      city: f.city,
-      state: f.state,
-      postalCode: f.postalCode,
-      notes: f.notes || null,
-      shippingMethodId: input.shippingMethodId,
-      shippingLabel: input.shippingLabel,
-      shippingCost,
-      subtotal,
-      total,
-      status: "PAGADO",
-      locale: input.locale,
-      items: { create: itemsData },
-    },
-  });
 }
 
 /**
@@ -144,20 +74,10 @@ export async function getMyOrders(): Promise<OrderSummary[]> {
   }));
 }
 
-/* ════════════════════════════════════════════════════════════════════════
- *  AÑADIR AL FINAL DE  src/actions/orders.ts
- * ────────────────────────────────────────────────────────────────────────
- *  No reemplaces el archivo: solo pega ESTA función al final. Reutiliza los
- *  imports que ya tiene orders.ts (prisma y getOptionalUser — getMyOrders ya
- *  los usa). Si por alguna razón no estuvieran, agrégalos:
- *      import { prisma } from "@/lib/prisma";
- *      import { getOptionalUser } from "@/lib/auth";
- * ════════════════════════════════════════════════════════════════════════ */
-
 /**
  * getOrderById — devuelve UN pedido con sus renglones, SOLO si pertenece al
  * usuario con sesión. Si no hay sesión, o el pedido no existe, o es de otra
- * persona, devuelve null (seguridad: nadie ve pedidos ajenos adivinando el id).
+ * persona, devuelve null (nadie ve pedidos ajenos adivinando el id).
  */
 export async function getOrderById(orderId: string) {
   const user = await getOptionalUser();
@@ -187,9 +107,16 @@ export async function getOrderById(orderId: string) {
     city: order.city,
     state: order.state,
     postalCode: order.postalCode,
+    // País de entrega (Etapa 7)
+    country: order.country,
     notes: order.notes,
     shippingLabel: order.shippingLabel,
     shippingCost: order.shippingCost,
+    // Seguimiento del envío (Etapa 6B)
+    carrier: order.carrier,
+    trackingNumber: order.trackingNumber,
+    shippedAt: order.shippedAt ? order.shippedAt.toISOString() : null,
+    deliveredAt: order.deliveredAt ? order.deliveredAt.toISOString() : null,
     // Montos
     subtotal: order.subtotal,
     total: order.total,

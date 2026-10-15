@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * PAGE: /[locale]/(account)/mis-pedidos/[orderId] — MKATALINA · Fase 13
+ * PAGE: /[locale]/(account)/mis-pedidos/[orderId] — MKATALINA · Fase 13 · Etapa 6B
  * ============================================================================
  *
  * Detalle completo de UN pedido, leído de la base (acción getOrderById).
@@ -15,6 +15,13 @@
  *   - order === null      → no existe o no es del usuario (mensaje + volver)
  *   - order (objeto)      → detalle completo
  *
+ * ETAPA 6B (corrección): la etiqueta del estado usa OrderStatusBadge, con un
+ * color por estado (antes todo salía en verde).
+ *
+ * ETAPA 6B: si el pedido ya se envió, aparece la sección "Seguimiento" con la
+ * paquetería, el número de guía (con botón para copiarlo), las fechas de
+ * envío/entrega y el botón "Rastrear mi paquete" (src/lib/shipping-carriers.ts).
+ *
  * Textos en un objeto {es, en} aquí mismo (autónomo, sin tocar messages.json).
  * ============================================================================
  */
@@ -28,21 +35,16 @@ import { Link } from "@/i18n/navigation";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getOrderById } from "@/actions/orders";
+import { OrderStatusBadge } from "@/components/account/OrderStatusBadge";
+import {
+  carrierLabel,
+  carrierNeedsPaste,
+  carrierTrackingUrl,
+} from "@/lib/shipping-carriers";
 import { formatPrice } from "@/lib/format";
-import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
 
 type OrderDetail = NonNullable<Awaited<ReturnType<typeof getOrderById>>>;
-
-// Etiquetas de estado (bilingües).
-const STATUS_LABELS: Record<string, { es: string; en: string }> = {
-  PENDIENTE: { es: "Pendiente", en: "Pending" },
-  PAGADO: { es: "Pagado", en: "Paid" },
-  PROCESANDO: { es: "Procesando", en: "Processing" },
-  ENVIADO: { es: "Enviado", en: "Shipped" },
-  ENTREGADO: { es: "Entregado", en: "Delivered" },
-  CANCELADO: { es: "Cancelado", en: "Cancelled" },
-};
 
 const COPY = {
   es: {
@@ -59,6 +61,15 @@ const COPY = {
     notFoundTitle: "Pedido no encontrado",
     notFoundText: "No encontramos este pedido, o no pertenece a tu cuenta.",
     loading: "Cargando…",
+    tracking: "Seguimiento",
+    carrier: "Paquetería",
+    trackingNumber: "Número de guía",
+    shippedOn: "Enviado el",
+    deliveredOn: "Entregado el",
+    track: "Rastrear mi paquete",
+    copy: "Copiar",
+    copied: "Copiado",
+    paste: "En la página de la paquetería, pega tu número de guía.",
   },
   en: {
     back: "Back to my orders",
@@ -74,6 +85,15 @@ const COPY = {
     notFoundTitle: "Order not found",
     notFoundText: "We couldn't find this order, or it isn't on your account.",
     loading: "Loading…",
+    tracking: "Tracking",
+    carrier: "Carrier",
+    trackingNumber: "Tracking number",
+    shippedOn: "Shipped on",
+    deliveredOn: "Delivered on",
+    track: "Track my package",
+    copy: "Copy",
+    copied: "Copied",
+    paste: "On the carrier's page, paste your tracking number.",
   },
 } as const;
 
@@ -87,6 +107,8 @@ export default function OrderDetailPage() {
 
   // undefined = cargando; null = no encontrado; objeto = cargado
   const [order, setOrder] = useState<OrderDetail | null | undefined>(undefined);
+  // true un par de segundos después de copiar la guía.
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     getOrderById(orderId)
@@ -129,7 +151,27 @@ export default function OrderDetailPage() {
     year: "numeric",
   }).format(new Date(order.createdAt));
 
-  const statusLabel = STATUS_LABELS[order.status]?.[lang] ?? order.status;
+
+  // Seguimiento (Etapa 6B)
+  const formatDay = (iso: string) =>
+    new Intl.DateTimeFormat(intlLocale, {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(new Date(iso));
+  const trackingUrl = carrierTrackingUrl(order.carrier, order.trackingNumber);
+
+  /** Copia la guía al portapapeles (útil para pegarla en Estafeta). */
+  const copyTracking = async () => {
+    if (!order.trackingNumber) return;
+    try {
+      await navigator.clipboard.writeText(order.trackingNumber);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Sin permiso de portapapeles: el número sigue visible para copiarlo a mano.
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -147,16 +189,60 @@ export default function OrderDetailPage() {
           <p className="text-sm text-muted-foreground mt-1">{orderDate}</p>
         </div>
 
-        <span
-          className={cn(
-            "inline-flex items-center gap-1.5 px-3 py-1 rounded-full self-start",
-            "bg-success/10 text-success text-xs font-medium",
-          )}
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-success" />
-          {statusLabel}
-        </span>
+        <OrderStatusBadge status={order.status} className="self-start" />
       </header>
+
+      {/* Seguimiento del envío (solo si ya se envió) */}
+      {order.carrier && order.shippedAt && (
+        <section className="border border-border rounded-md bg-card p-6 space-y-3">
+          <h2 className="text-xs uppercase tracking-[0.15em] font-medium">
+            {t.tracking}
+          </h2>
+          <dl className="grid gap-2 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-muted-foreground text-xs">{t.carrier}</dt>
+              <dd>{carrierLabel(order.carrier, lang)}</dd>
+            </div>
+            {order.trackingNumber && (
+              <div>
+                <dt className="text-muted-foreground text-xs">{t.trackingNumber}</dt>
+                <dd className="flex items-center gap-2">
+                  <span className="font-mono">{order.trackingNumber}</span>
+                  <button
+                    type="button"
+                    onClick={() => void copyTracking()}
+                    className="text-xs text-accent hover:underline"
+                  >
+                    {copied ? t.copied : t.copy}
+                  </button>
+                </dd>
+              </div>
+            )}
+            <div>
+              <dt className="text-muted-foreground text-xs">{t.shippedOn}</dt>
+              <dd>{formatDay(order.shippedAt)}</dd>
+            </div>
+            {order.deliveredAt && (
+              <div>
+                <dt className="text-muted-foreground text-xs">{t.deliveredOn}</dt>
+                <dd>{formatDay(order.deliveredAt)}</dd>
+              </div>
+            )}
+          </dl>
+          {trackingUrl && (
+            <div className="space-y-1">
+              <Button asChild size="sm">
+                <a href={trackingUrl} target="_blank" rel="noopener noreferrer">
+                  {t.track} ↗
+                </a>
+              </Button>
+              {carrierNeedsPaste(order.carrier) && (
+                <p className="text-xs text-muted-foreground">{t.paste}</p>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Productos */}
       <section className="border border-border rounded-md bg-card overflow-hidden">

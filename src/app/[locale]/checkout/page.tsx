@@ -1,19 +1,29 @@
 /**
  * ============================================================================
- * PAGE: /[locale]/checkout — MKATALINA (Fase 13 · Etapa 4: PayPal real)
+ * PAGE: /[locale]/checkout — MKATALINA (Fase 13 · Etapa 7: envíos al mundo)
  * ============================================================================
  *
- * Cambio de esta etapa:
- *   - Se eliminó el "pago simulado" (setTimeout + createOrder antes de pagar).
- *   - Ahora el pago lo hace el botón real de PayPal (PaypalCheckoutButton).
- *   - El pedido se crea EN EL SERVIDOR cuando el pago se confirma (dentro de
- *     capturePaypalOrder). Aquí solo: validamos el formulario, y al tener éxito
- *     guardamos el snapshot para la confirmación, vaciamos el carrito y vamos a
- *     la página de confirmación.
+ * Página de pago: formulario (CheckoutForm) a la izquierda y resumen con los
+ * botones de pago (CheckoutSummary + PaypalCheckoutButton) a la derecha.
+ * El pedido se crea EN EL SERVIDOR al confirmarse el cobro
+ * (capturePaypalOrder, src/actions/paypal.ts); aquí se valida el formulario,
+ * y al tener éxito se guarda el snapshot para la confirmación, se vacía el
+ * carrito y se va a la página de confirmación.
  *
- * Lo que NO cambia:
- *   - La UI, el formulario y su validación, el resumen.
- *   - La confirmación sigue leyendo el snapshot de sessionStorage.
+ * CAMBIOS DE LA ETAPA 7 — COMPRAS DESDE CUALQUIER PAÍS:
+ *   - El formulario tiene PAÍS de entrega. Al cambiarlo:
+ *       · se borra el estado elegido (cada país tiene su lista);
+ *       · el método de envío pasa al primero disponible para ese país
+ *         (México: estándar; extranjero: DHL Express internacional);
+ *       · la lada del teléfono cambia al nuevo país, SALVO que el cliente
+ *         ya la haya cambiado a mano (phoneCountryTouched).
+ *   - Los métodos y el precio del envío salen de src/lib/shipping-rates.ts
+ *     según el país; el servidor los vuelve a calcular al cobrar.
+ *   - La lista de estados/provincias se pide con useSubdivisions; si el país
+ *     tiene lista, el estado es obligatorio (stateRequired).
+ *   - Las reglas de validación son las de src/lib/address.ts.
+ *
+ * La confirmación sigue leyendo el snapshot de sessionStorage.
  * ============================================================================
  */
 
@@ -24,17 +34,23 @@ import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { Container } from "@/components/layout/Container";
 import { Breadcrumb } from "@/components/shop/Breadcrumb";
-import { CheckoutForm, validateField } from "@/components/shop/CheckoutForm";
+import { CheckoutForm, validateCheckoutField } from "@/components/shop/CheckoutForm";
 import { CheckoutSummary } from "@/components/shop/CheckoutSummary";
 import { PaypalCheckoutButton } from "@/components/shop/PaypalCheckoutButton";
 import { useCart } from "@/hooks/use-cart";
+import { useSubdivisions } from "@/hooks/use-subdivisions";
 import {
   EMPTY_FORM_DATA,
-  getShippingMethodResolved,
   type CheckoutFormData,
   type FormErrors,
+  type ShippingMethod,
   type ShippingMethodId,
 } from "@/types/checkout";
+import {
+  CUSTOMS_NOTICE,
+  getShippingOptions,
+  isInternational,
+} from "@/lib/shipping-rates";
 import { toast } from "sonner";
 import { getLocalized } from "@/lib/i18n-helpers";
 import type { Locale } from "@/i18n/routing";
@@ -45,13 +61,16 @@ export default function CheckoutPage() {
 
   const locale = useLocale() as Locale;
   const t = useTranslations("checkout.page");
-  const tForm = useTranslations("checkoutForm");
-  const tShipping = useTranslations("checkout.shippingMethods");
 
   const [formData, setFormData] = useState<CheckoutFormData>(EMPTY_FORM_DATA);
   const [errors, setErrors] = useState<FormErrors>({});
-  const [shippingMethodId, setShippingMethodId] =
-    useState<ShippingMethodId>("estandar");
+  const [shippingMethodId, setShippingMethodId] = useState<ShippingMethodId>("estandar");
+  // true cuando el cliente cambió la lada a mano (ya no sigue al país).
+  const [phoneCountryTouched, setPhoneCountryTouched] = useState(false);
+
+  // Estados / provincias del país elegido.
+  const { subdivisions, isLoading: subdivisionsLoading } = useSubdivisions(formData.country);
+  const validationOptions = { stateRequired: subdivisions.length > 0 };
 
   // Evita que el guard de "carrito vacío" nos saque mientras finalizamos
   // (al vaciar el carrito tras un pago exitoso).
@@ -68,13 +87,37 @@ export default function CheckoutPage() {
     }
   }, [mounted, isEmpty, isCompleting, router]);
 
-  const shippingMethod = getShippingMethodResolved(shippingMethodId, tShipping);
+  // Métodos de envío para el país elegido y el que está seleccionado.
+  const shippingOptions = getShippingOptions(formData.country, locale);
+  const selectedOption =
+    shippingOptions.find((o) => o.id === shippingMethodId) ?? shippingOptions[0];
+  const shippingMethod: ShippingMethod = selectedOption;
   const total = subtotal + shippingMethod.price;
 
-  const handleFieldChange = (
-    field: keyof CheckoutFormData,
-    value: string,
-  ) => {
+  const handleFieldChange = (field: keyof CheckoutFormData, value: string) => {
+    if (field === "country") {
+      // Nuevo país: estado vacío, primer método disponible y (si no se
+      // tocó) la lada del mismo país.
+      setFormData((prev) => ({
+        ...prev,
+        country: value,
+        state: "",
+        phoneCountry: phoneCountryTouched ? prev.phoneCountry : value,
+      }));
+      setShippingMethodId(getShippingOptions(value, locale)[0].id);
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.country;
+        delete next.state;
+        delete next.neighborhood;
+        delete next.postalCode;
+        return next;
+      });
+      return;
+    }
+
+    if (field === "phoneCountry") setPhoneCountryTouched(true);
+
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => {
@@ -86,43 +129,39 @@ export default function CheckoutPage() {
   };
 
   const handleFieldBlur = (field: keyof CheckoutFormData) => {
-    const error = validateField(field, formData[field], tForm);
+    const error = validateCheckoutField(field, formData, locale, validationOptions);
     if (error) {
       setErrors((prev) => ({ ...prev, [field]: error }));
     }
   };
 
-  const validateAll = (): boolean => {
-    const newErrors: FormErrors = {};
+  /** Revisa todo el formulario; devuelve los errores encontrados. */
+  const collectErrors = (): FormErrors => {
+    const found: FormErrors = {};
     (Object.keys(formData) as Array<keyof CheckoutFormData>).forEach((field) => {
-      const error = validateField(field, formData[field], tForm);
-      if (error) {
-        newErrors[field] = error;
-      }
+      const error = validateCheckoutField(field, formData, locale, validationOptions);
+      if (error) found[field] = error;
     });
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return found;
   };
 
   /**
-   * validate — se llama al hacer clic en el botón de PayPal, ANTES de abrirlo.
+   * validate — se llama al hacer clic en un botón de pago, ANTES de abrirlo.
    * Si hay errores, enfoca el primero, avisa, y devuelve false (no abre PayPal).
    */
   const validate = (): boolean => {
-    if (validateAll()) return true;
+    const found = collectErrors();
+    setErrors(found);
+    const firstErrorField = (Object.keys(formData) as Array<keyof CheckoutFormData>).find(
+      (f) => found[f],
+    );
+    if (!firstErrorField) return true;
 
-    const firstErrorField = (
-      Object.keys(formData) as Array<keyof CheckoutFormData>
-    ).find((f) => validateField(f, formData[f], tForm) !== undefined);
-
-    if (firstErrorField) {
-      const element = document.getElementById(firstErrorField);
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth", block: "center" });
-        element.focus();
-      }
+    const element = document.getElementById(firstErrorField);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      element.focus();
     }
-
     toast.error(t("errorToast.title"), {
       description: t("errorToast.description"),
     });
@@ -166,10 +205,7 @@ export default function CheckoutPage() {
     };
 
     try {
-      sessionStorage.setItem(
-        "katalina-last-order",
-        JSON.stringify(orderSnapshot),
-      );
+      sessionStorage.setItem("katalina-last-order", JSON.stringify(orderSnapshot));
     } catch {
       // sessionStorage puede fallar (incógnito); no es crítico.
     }
@@ -200,9 +236,7 @@ export default function CheckoutPage() {
       <Container>
         <div className="pb-16">
           <header className="mb-8">
-            <h1 className="font-display text-4xl md:text-5xl font-medium">
-              {t("title")}
-            </h1>
+            <h1 className="font-display text-4xl md:text-5xl font-medium">{t("title")}</h1>
           </header>
 
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8 lg:gap-12 items-start">
@@ -210,7 +244,10 @@ export default function CheckoutPage() {
               <CheckoutForm
                 formData={formData}
                 errors={errors}
-                shippingMethod={shippingMethodId}
+                shippingMethod={shippingMethod.id}
+                shippingOptions={shippingOptions}
+                subdivisions={subdivisions}
+                subdivisionsLoading={subdivisionsLoading}
                 onChange={handleFieldChange}
                 onBlur={handleFieldBlur}
                 onShippingMethodChange={setShippingMethodId}
@@ -223,11 +260,15 @@ export default function CheckoutPage() {
                 subtotal={subtotal}
                 shippingMethod={shippingMethod}
                 total={total}
+                notice={
+                  isInternational(formData.country)
+                    ? CUSTOMS_NOTICE[locale === "en" ? "en" : "es"]
+                    : undefined
+                }
                 paymentButton={
                   <PaypalCheckoutButton
                     items={preparedItems}
-                    shippingMethodId={shippingMethodId}
-                    shippingLabel={shippingMethod.label}
+                    shippingMethodId={shippingMethod.id}
                     formData={formData}
                     locale={locale}
                     validate={validate}

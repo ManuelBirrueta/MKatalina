@@ -1,35 +1,27 @@
 /**
  * ============================================================================
- * LOCALE LAYOUT — MKATALINA (Fase 12 Turno 3A: + SEO bilingüe)
+ * LOCALE LAYOUT — MKATALINA (Fase 13 · Etapa 3B: + catálogo desde la base)
  * ============================================================================
  *
- * Cambios respecto a la versión anterior:
- *   - generateMetadata reemplaza la metadata estática anterior
- *   - generateMetadata recibe `params.locale` y genera metadata específica
- *     para ese idioma:
- *       - title/description en el idioma activo (cuando sea aplicable)
- *       - alternates.canonical apunta a la URL en el idioma activo
- *       - alternates.languages declara TODAS las versiones del sitio
- *         (es y en) para que Google genere los <link rel="alternate" hreflang>
- *       - OpenGraph locale dinámico
+ * CAMBIO DE ESTA ETAPA (catálogo para el navegador):
+ *   - Se lee el catálogo de productos VISIBLES desde la base
+ *     (getActiveProducts) y se entrega a <CatalogProvider>, que lo comparte
+ *     con la búsqueda, el carrito y la wishlist (componentes de navegador que
+ *     no pueden consultar la base).
+ *   - `dynamic = "force-dynamic"`: este layout envuelve TODAS las páginas. Si
+ *     Next.js lo congelara al compilar (como puede pasar con el inicio o las
+ *     páginas informativas), el carrito y la búsqueda de esas páginas usarían
+ *     precios y productos viejos hasta el siguiente despliegue. Así, cada
+ *     visita lee el catálogo actual.
+ *
+ * Lo que NO cambia:
+ *   - generateMetadata (SEO bilingüe con canonical, hreflang, OpenGraph…).
+ *   - NextIntlClientProvider, Header, Footer, Toaster y datos estructurados.
  *
  * Sobre alternates.languages:
- *   Esto le dice a Next.js que genere automáticamente tags como:
- *     <link rel="alternate" hreflang="es" href="https://Mkatalina.mx/es" />
- *     <link rel="alternate" hreflang="en" href="https://Mkatalina.mx/en" />
- *     <link rel="alternate" hreflang="x-default" href="https://Mkatalina.mx/es" />
- *
- *   El "x-default" es el idioma fallback cuando Google no puede determinar
- *   la preferencia del usuario. Usamos español porque es nuestro default.
- *
- * Sobre las URLs en alternates:
- *   Apuntamos a "/es" y "/en" (las raíces de cada idioma). Cada página
- *   individual debería tener SUS PROPIOS alternates específicos (página
- *   /es/aretes apunta a /en/aretes). Pero para el layout global, declarar
- *   las raíces ya da a Google la señal de "este sitio existe en es y en".
- *
- *   Las páginas individuales pueden sobreescribir esto con su propio
- *   generateMetadata si necesitan alternates más específicos.
+ *   Next.js genera automáticamente los <link rel="alternate" hreflang="…">
+ *   para /es, /en y x-default (español, el idioma por defecto). Cada página
+ *   puede declarar alternates más específicos en su propio generateMetadata.
  * ============================================================================
  */
 
@@ -42,6 +34,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { CatalogProvider } from "@/components/providers/CatalogProvider";
+import { getActiveProducts } from "@/lib/products-db";
 import { organizationSchema, websiteSchema } from "@/lib/jsonld";
 import { routing } from "@/i18n/routing";
 import {
@@ -53,9 +47,12 @@ import {
   GOOGLE_SITE_VERIFICATION,
 } from "@/lib/seo";
 
+// Generar en cada visita para que el catálogo esté siempre al día (ver cabecera).
+export const dynamic = "force-dynamic";
+
 /**
- * generateStaticParams genera una version estática para cada locale.
- * Next.js usa esto en build time para pre-renderizar /es/* y /en/*.
+ * Los idiomas válidos de la ruta (/es, /en). Con force-dynamic ya no se
+ * pre-generan páginas al compilar, pero se conserva como lista de idiomas.
  */
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -67,18 +64,8 @@ interface LayoutProps {
 }
 
 /**
- * Generar metadata dinámica según el locale.
- *
- * Cambio importante respecto a versión anterior:
- *   - Antes era `export const metadata`: estática, igual para todos los locales
- *   - Ahora es `export async function generateMetadata`: dinámica, recibe
- *     params y genera distinta metadata para /es y /en
- *
- * Esto permite:
- *   - alternates.canonical específica del locale activo
- *   - alternates.languages declarando ambas versiones
- *   - openGraph.locale correcto (es_MX vs en_US)
- *   - html lang correcto en cada versión
+ * Metadata dinámica según el idioma: canonical del idioma activo, hreflang
+ * de todas las versiones, OpenGraph con es_MX / en_US, palabras clave, etc.
  */
 export async function generateMetadata({
   params,
@@ -87,34 +74,19 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
 
-  /**
-   * URL canónica del locale activo.
-   * Si estamos generando metadata para /es, canonical es https://Mkatalina.mx/es
-   */
+  // URL canónica del idioma activo (ej. https://…/es).
   const canonicalUrl = `${SITE_URL}/${locale}`;
 
-  /**
-   * languages: mapping de cada locale soportado a su URL.
-   * Next.js genera automáticamente los <link rel="alternate" hreflang> en HTML.
-   */
+  // Cada idioma soportado → su URL (Next.js genera los <link hreflang>).
   const languages: Record<string, string> = {};
   routing.locales.forEach((loc) => {
     languages[loc] = `${SITE_URL}/${loc}`;
   });
 
-  /**
-   * x-default: idioma fallback cuando Google no sabe qué servir.
-   * Usamos español porque es nuestro default.
-   *
-   * Aunque defaultLocale es "es", apuntamos a /es explícitamente porque
-   * con localePrefix: "always", no hay URL sin prefijo.
-   */
+  // x-default: el idioma de respaldo cuando Google no sabe cuál servir.
   languages["x-default"] = `${SITE_URL}/${routing.defaultLocale}`;
 
-  /**
-   * Mapeo de locale a códigos OpenGraph estándar.
-   * OpenGraph espera códigos como "es_MX", "en_US", no solo "es" o "en".
-   */
+  // OpenGraph espera códigos como "es_MX" / "en_US".
   const openGraphLocale = locale === "es" ? "es_MX" : "en_US";
 
   return {
@@ -202,15 +174,6 @@ export async function generateMetadata({
       ? { google: GOOGLE_SITE_VERIFICATION }
       : undefined,
 
-    /**
-     * Alternates: declara las versiones bilingues a Google.
-     *
-     * Next.js convierte esto en:
-     *   <link rel="canonical" href="https://Mkatalina.mx/es" />
-     *   <link rel="alternate" hreflang="es" href="https://Mkatalina.mx/es" />
-     *   <link rel="alternate" hreflang="en" href="https://Mkatalina.mx/en" />
-     *   <link rel="alternate" hreflang="x-default" href="https://Mkatalina.mx/es" />
-     */
     alternates: {
       canonical: canonicalUrl,
       languages,
@@ -230,7 +193,11 @@ export default async function LocaleLayout({
 
   setRequestLocale(locale);
 
-  const messages = await getMessages();
+  // Traducciones y catálogo en paralelo (no dependen uno del otro).
+  const [messages, catalog] = await Promise.all([
+    getMessages(),
+    getActiveProducts(),
+  ]);
 
   return (
     <html lang={locale}>
@@ -238,14 +205,21 @@ export default async function LocaleLayout({
         className={`${dmSans.variable} ${playfair.variable} font-sans antialiased`}
       >
         <NextIntlClientProvider locale={locale} messages={messages}>
-          {/* Structured data global */}
-          <JsonLd data={organizationSchema()} />
-          <JsonLd data={websiteSchema()} />
+          {/*
+           * CatalogProvider envuelve Header (contador del carrito, búsqueda),
+           * las páginas y el Footer: todo lo que use useCart, useWishlist o
+           * useCatalog debe quedar dentro.
+           */}
+          <CatalogProvider products={catalog}>
+            {/* Structured data global */}
+            <JsonLd data={organizationSchema()} />
+            <JsonLd data={websiteSchema()} />
 
-          <Header />
-          <main>{children}</main>
-          <Footer />
-          <Toaster />
+            <Header />
+            <main>{children}</main>
+            <Footer />
+            <Toaster />
+          </CatalogProvider>
         </NextIntlClientProvider>
       </body>
     </html>

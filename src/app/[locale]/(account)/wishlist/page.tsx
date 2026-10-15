@@ -1,19 +1,18 @@
 /**
  * ============================================================================
- * PAGE: /[locale]/(account)/wishlist — MKATALINA
+ * PAGE: /[locale]/(account)/wishlist — MKATALINA (Fase 13 · Etapa 3B)
  * ============================================================================
  *
- * Cambio de la Fase 13 (Etapa 3):
- *   - Ahora la wishlist viene de la base de datos (vía el hook useWishlist,
- *     que la trae al cargar). Como esa carga es asíncrona, agregamos un estado
- *     de CARGA: mientras `isLoading` es true, mostramos un placeholder en vez
- *     del mensaje de "wishlist vacía". Sin esto, la página mostraría "vacía"
- *     un instante antes de que llegaran los datos de la base (un parpadeo feo).
+ * CAMBIO DE LA ETAPA 3B:
+ *   - Cada slug guardado se convierte en su producto con useCatalog()
+ *     (catálogo de la base, vía el layout) en lugar de getProductBySlug() de
+ *     src/data/products.ts. Los productos retirados no aparecen.
  *
  * Lo que NO cambia:
- *   - useWishlist().items sigue devolviendo slugs
- *   - getProductBySlug resuelve cada slug a Product completo (bilingüe)
- *   - ProductCard ya es bilingüe → muestra nombres en el idioma activo
+ *   - La wishlist viene de la base vía useWishlist (carga asíncrona). Mientras
+ *     `isLoading` es true se muestra un placeholder en vez del mensaje de
+ *     "wishlist vacía" (evita un parpadeo).
+ *   - ProductCard ya es bilingüe → muestra nombres en el idioma activo.
  *   - La wishlist guarda solo referencias (slugs): al cambiar de idioma, los
  *     productos se re-resuelven al nuevo idioma (no es una factura inmutable).
  * ============================================================================
@@ -27,26 +26,26 @@ import { Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { useWishlist } from "@/hooks/use-wishlist";
-import { getProductBySlug } from "@/data/products";
+import { useCatalog } from "@/components/providers/CatalogProvider";
 import { cn } from "@/lib/utils";
+import type { Product } from "@/types/product";
 
 export default function WishlistPage() {
   const t = useTranslations("wishlistPage");
   const { items, isLoading } = useWishlist();
+  const { getBySlug } = useCatalog();
 
   /**
-   * Resolver slugs a productos completos.
-   * Filtramos null (productos que ya no existen en el catálogo).
+   * Slugs → productos completos del catálogo. useWishlist ya devuelve solo
+   * los visibles; el filtro es una protección extra.
    */
   const products = items
-    .map((slug) => getProductBySlug(slug))
-    .filter((p): p is NonNullable<typeof p> => p !== null);
+    .map((slug) => getBySlug(slug))
+    .filter((p): p is Product => p !== null);
 
   const isEmpty = products.length === 0;
 
-  /**
-   * Subtítulo dinámico. Mientras carga no mostramos conteo (aún no es fiable).
-   */
+  // Subtítulo dinámico. Mientras carga no mostramos conteo (aún no es fiable).
   const subtitleText = isLoading
     ? ""
     : isEmpty
@@ -85,16 +84,11 @@ export default function WishlistPage() {
 }
 
 /**
- * WishlistGrid — grid de productos guardados.
- * Reutiliza ProductCard (que ya trae el corazón integrado y bilingüe). Al
- * quitar de la wishlist, el grid se actualiza solo porque useWishlist es
- * reactivo (la caché del store cambia y re-renderiza).
+ * WishlistGrid — cuadrícula de productos guardados.
+ * Reutiliza ProductCard (con el corazón integrado). Al quitar uno, la
+ * cuadrícula se actualiza sola porque useWishlist es reactivo.
  */
-function WishlistGrid({
-  products,
-}: {
-  products: NonNullable<ReturnType<typeof getProductBySlug>>[];
-}) {
+function WishlistGrid({ products }: { products: Product[] }) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-10">
       {products.map((product, index) => (

@@ -1,32 +1,40 @@
 /**
  * ============================================================================
- * USE WISHLIST — MKATALINA (Fase 13 · Etapa 3: persistencia real en la base)
+ * USE WISHLIST — MKATALINA (Fase 13 · Etapa 3: base de datos + catálogo)
  * ============================================================================
  *
- * QUÉ CAMBIÓ RESPECTO A LA VERSIÓN ANTERIOR
- * -----------------------------------------
- * El motor pasó de localStorage a la BASE DE DATOS (vía acciones de servidor).
- * Lo importante: la API que consume la UI es la MISMA de antes (requiresAuth,
- * itemCount, items, has, add, remove), más un `isLoading` nuevo (aditivo). Por
- * eso el ProductCard y la página de wishlist siguen funcionando casi igual.
+ * La API que consume la UI es la MISMA (requiresAuth, isLoading, itemCount,
+ * items, has, add, remove), así que ProductCard y la página de wishlist siguen
+ * funcionando igual.
+ *
+ * CAMBIO DE LA ETAPA 3B:
+ *   - Para convertir un id o slug al slug del producto se usa useCatalog()
+ *     (catálogo de la base, vía el layout) en vez de productsData (código).
+ *   - PRODUCTOS RETIRADOS: si alguien guardó un producto que después se
+ *     retira desde el panel, su slug sigue en la base pero ya no está en el
+ *     catálogo. Ahora:
+ *       · `items` e `itemCount` cuentan SOLO productos visibles, así el
+ *         número del corazón en el header coincide con lo que muestra la
+ *         página de wishlist (antes contaba también los retirados).
+ *       · remove() acepta también un slug guardado que ya no está en el
+ *         catálogo, para que siempre se pueda quitar.
  *
  * CÓMO FLUYE LA INFORMACIÓN
  * -------------------------
  *   1. Al haber un usuario (y una vez resuelta la sesión), el hook trae su
  *      wishlist desde la base UNA vez (getMyWishlist) y la mete en la caché.
  *   2. has() lee de esa caché (instantáneo, sin ir al servidor).
- *   3. add()/remove() hacen actualización OPTIMISTA: cambian la caché al
- *      instante y persisten en la base en segundo plano; si falla, revierten.
+ *   3. add()/remove() son OPTIMISTAS: cambian la caché al instante y persisten
+ *      en la base en segundo plano; si falla, revierten.
  *   4. Al cerrar sesión, la caché se limpia.
  *
  * POR QUÉ ESPERAMOS A QUE LA SESIÓN SE RESUELVA (authLoading)
  * ----------------------------------------------------------
- * Muchos componentes (cada tarjeta de producto) usan este hook a la vez, y
- * cada uno tiene su propia instancia de useAuth que resuelve la sesión en
- * momentos distintos. Si actuáramos antes de que la sesión esté resuelta, unas
- * instancias creerían "sin sesión" y otras "con sesión", y pelearían por la
- * caché compartida (una limpia, otra carga, en bucle infinito). Por eso el
- * efecto no hace NADA mientras authLoading sea true.
+ * Muchos componentes (cada tarjeta de producto) usan este hook a la vez, cada
+ * uno con su propia instancia de useAuth que resuelve la sesión en momentos
+ * distintos. Si actuáramos antes, unas instancias creerían "sin sesión" y
+ * otras "con sesión", y pelearían por la caché compartida en bucle infinito.
+ * Por eso el efecto no hace NADA mientras authLoading sea true.
  * ============================================================================
  */
 
@@ -35,7 +43,7 @@
 import { useEffect } from "react";
 import { useWishlistStore } from "@/stores/wishlist-store";
 import { useAuth } from "@/hooks/use-auth";
-import { productsData } from "@/data/products";
+import { useCatalog } from "@/components/providers/CatalogProvider";
 import {
   getMyWishlist,
   addToWishlist as addToWishlistAction,
@@ -48,9 +56,9 @@ interface UseWishlistReturn {
   requiresAuth: boolean;
   /** True mientras se trae la wishlist de la base por primera vez. */
   isLoading: boolean;
-  /** Cantidad de items en la wishlist. */
+  /** Cantidad de productos VISIBLES en la wishlist. */
   itemCount: number;
-  /** Array de slugs en la wishlist. */
+  /** Slugs de los productos VISIBLES en la wishlist. */
   items: string[];
   /** True si el producto está en la wishlist. Acepta id o slug. */
   has: (idOrSlug: string) => boolean;
@@ -60,23 +68,12 @@ interface UseWishlistReturn {
   remove: (idOrSlug: string) => void;
 }
 
-/**
- * Resuelve un id o slug al slug canónico del producto.
- * Devuelve null si no corresponde a ningún producto del catálogo.
- */
-function resolveSlug(idOrSlug: string): string | null {
-  const bySlug = productsData.find((p) => p.slug === idOrSlug);
-  if (bySlug) return bySlug.slug;
-
-  const byId = productsData.find((p) => p.id === idOrSlug);
-  if (byId) return byId.slug;
-
-  return null;
-}
-
 export function useWishlist(): UseWishlistReturn {
   // authLoading = true mientras la sesión aún no se resuelve (ver cabecera).
   const { user, requiresAuth, isLoading: authLoading } = useAuth();
+
+  // Catálogo visible: convierte id/slug al slug canónico (null si retirado).
+  const { resolveSlug } = useCatalog();
 
   const slugs = useWishlistStore((s) => s.slugs);
   const status = useWishlistStore((s) => s.status);
@@ -87,8 +84,8 @@ export function useWishlist(): UseWishlistReturn {
   const reset = useWishlistStore((s) => s.reset);
 
   useEffect(() => {
-    // 1) Esperar a que la sesión esté resuelta. Esto es lo que evita el bucle
-    //    infinito entre instancias que resuelven la sesión a destiempo.
+    // 1) Esperar a que la sesión esté resuelta (evita el bucle infinito entre
+    //    instancias que resuelven la sesión a destiempo).
     if (authLoading) return;
 
     // 2) Sin usuario: dejar la caché limpia.
@@ -105,6 +102,9 @@ export function useWishlist(): UseWishlistReturn {
     }
   }, [authLoading, user, status, beginLoad, finishLoad, reset]);
 
+  // Solo los guardados que siguen visibles en el catálogo.
+  const visibleSlugs = slugs.filter((slug) => resolveSlug(slug) !== null);
+
   const has = (idOrSlug: string): boolean => {
     if (requiresAuth) return false;
     const slug = resolveSlug(idOrSlug);
@@ -114,6 +114,7 @@ export function useWishlist(): UseWishlistReturn {
   const add = (idOrSlug: string): void => {
     // Sin sesión no hacemos nada: la UI debe haber redirigido a login antes.
     if (requiresAuth || !user) return;
+    // Solo se pueden agregar productos visibles del catálogo.
     const slug = resolveSlug(idOrSlug);
     if (!slug || slugs.includes(slug)) return;
 
@@ -127,7 +128,10 @@ export function useWishlist(): UseWishlistReturn {
 
   const remove = (idOrSlug: string): void => {
     if (requiresAuth || !user) return;
-    const slug = resolveSlug(idOrSlug);
+    // Visible → su slug. Retirado pero guardado → se acepta tal cual, para
+    // que siempre se pueda quitar.
+    const slug =
+      resolveSlug(idOrSlug) ?? (slugs.includes(idOrSlug) ? idOrSlug : null);
     if (!slug) return;
 
     removeSlug(slug); // optimista
@@ -139,11 +143,11 @@ export function useWishlist(): UseWishlistReturn {
 
   return {
     requiresAuth,
-    // isLoading (de la wishlist) es true cuando hay usuario y la caché aún no
-    // terminó de cargar, o mientras la propia sesión se resuelve.
+    // isLoading es true cuando hay usuario y la caché aún no terminó de
+    // cargar, o mientras la propia sesión se resuelve.
     isLoading: authLoading || (!!user && status !== "loaded"),
-    itemCount: slugs.length,
-    items: slugs,
+    itemCount: visibleSlugs.length,
+    items: visibleSlugs,
     has,
     add,
     remove,

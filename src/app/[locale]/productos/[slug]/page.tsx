@@ -1,29 +1,41 @@
 /**
  * ============================================================================
- * PAGE: /[locale]/productos/[slug] — KATALINA (fix Turno 3B.2)
+ * PAGE: /[locale]/productos/[slug] — MKATALINA (Fase 13 · Etapa 3: desde la base)
  * ============================================================================
  *
- * Cambios respecto a la versión anterior:
- *   - Obtiene el locale activo con getLocale() de next-intl/server
- *   - Resuelve product.name con getLocalized() para meta tags y schema
- *   - Resuelve extras.description con getLocalized() antes de pasarlo a
- *     buildProductDescription (que sigue trabajando con strings)
- *   - Resuelve los labels de material/color para fallback de description
+ * Ficha de un producto. Componente de SERVIDOR que arma la metadata SEO, los
+ * datos estructurados (JSON-LD) y la página, y les pasa los datos ya listos a
+ * los componentes hijos (ProductInfo, ProductAccordion… son de navegador y
+ * resuelven el idioma por su cuenta con useLocale).
  *
- * Por qué necesitamos resolver al locale en esta página (server side):
- *   - La metadata (title, description, OG, twitter) se renderiza server-side
- *     y va en el HTML inicial. Necesita estar en el idioma correcto.
- *   - El structured data (JSON-LD) también va en el HTML inicial. Google
- *     necesita ver descripciones consistentes con la metadata.
- *   - Los componentes hijos (ProductInfo, ProductAccordion) son Client y
- *     resuelven sus propios datos con useLocale, pero el server-side data
- *     debe pre-resolverse aquí.
+ * CAMBIOS DE ESTA ETAPA:
  *
- * Sobre buildProductDescription:
- *   Sigue siendo una función pura que recibe strings y devuelve string.
- *   No la cambiamos — solo le pasamos los strings ya resueltos en lugar
- *   de los objetos LocalizedString crudos. Esto mantiene la función simple
- *   y testeable.
+ *   1. El producto se lee de la BASE con getProductDetail() de
+ *      src/lib/products-db.ts. Ese único dato ya trae todo lo que antes se
+ *      juntaba a mano (products.ts + productDetailsMap/defaultExtras):
+ *      descripción, medidas y cuidados. Un producto retirado desde el panel
+ *      (isActive = false) devuelve null → 404.
+ *
+ *   2. SE QUITÓ generateStaticParams y se agregó `dynamic = "force-dynamic"`.
+ *      generateStaticParams generaba TODAS las fichas al compilar, lo que
+ *      congelaba precio, stock y nombre hasta el siguiente despliegue. Ahora
+ *      cada visita lee la base, así que lo que cambies en el panel se ve al
+ *      recargar.
+ *
+ *   3. Los relacionados vienen de getRelatedProducts() (misma categoría, sin
+ *      el actual, solo visibles).
+ *
+ *   4. RESEÑAS: la sección de reseñas sigue usando los datos de muestra de
+ *      src/data/reviews.ts (pasarlas a la base es un paso aparte). Para que
+ *      las estrellitas de arriba (ProductInfo) coincidan SIEMPRE con la
+ *      sección de abajo, averageRating y reviewCount se calculan con esas
+ *      mismas reseñas, y no con la tabla `reviews` (hoy vacía).
+ *
+ * generateMetadata y getProductDetail se llaman con el mismo slug en la misma
+ * petición; gracias a cache() de React la base se consulta una sola vez.
+ *
+ * Sobre buildProductDescription: sigue siendo una función pura que recibe
+ * strings ya resueltos al idioma y devuelve el texto para SEO.
  * ============================================================================
  */
 
@@ -39,12 +51,7 @@ import { ProductAccordion } from "@/components/shop/ProductAccordion";
 import { ProductReviews } from "@/components/shop/ProductReviews";
 import { RelatedProducts } from "@/components/shop/RelatedProducts";
 import { JsonLd } from "@/components/seo/JsonLd";
-import {
-  productsData,
-  getProductBySlug,
-  getProductsByCategory,
-} from "@/data/products";
-import { productDetailsMap, defaultExtras } from "@/data/product-details";
+import { getProductDetail, getRelatedProducts } from "@/lib/products-db";
 import {
   getReviewsByProduct,
   calculateReviewStats,
@@ -56,33 +63,23 @@ import { getLocalized } from "@/lib/i18n-helpers";
 import type { Locale } from "@/i18n/routing";
 import type { Product } from "@/types/product";
 
+// Leer la base en cada visita (ver punto 2 de la cabecera).
+export const dynamic = "force-dynamic";
+
 interface PageProps {
   params: Promise<{ slug: string; locale: string }>;
 }
 
-export async function generateStaticParams() {
-  return productsData.map((product) => ({
-    slug: product.slug,
-  }));
-}
-
 /**
- * buildProductDescription — sin cambios estructurales.
- *
- * Sigue recibiendo strings. La diferencia es que ahora el caller
- * (generateMetadata y ProductDetailPage) le pasa los strings YA
- * resueltos al locale, en lugar de objetos LocalizedString crudos.
- *
- * Esta función pura es fácil de testear independientemente y mantiene
- * la separación de responsabilidades: el caller maneja localización,
- * esta función maneja formato.
+ * buildProductDescription — texto para metadata y JSON-LD.
+ * Recibe strings YA resueltos al idioma activo.
  */
 function buildProductDescription(
   product: Product,
   productName: string,
   detailsDescription: string | undefined,
   materialText: string,
-  colorText: string
+  colorText: string,
 ): string {
   if (detailsDescription) {
     const trimmed = detailsDescription.slice(0, 120);
@@ -93,24 +90,8 @@ function buildProductDescription(
 }
 
 /**
- * Helper: obtener extras del producto (con fallback a defaultExtras).
- *
- * Cambio respecto a la versión anterior:
- *   defaultExtras ahora recibe SOLO el material (su firma cambió en
- *   product-details.ts del Turno 3B.1).
- */
-function getExtras(product: Product) {
-  return productDetailsMap[product.slug] ?? defaultExtras(product.material);
-}
-
-/**
- * Mappings de material y color a labels en cada idioma.
- *
- * Los usamos como fallback cuando el producto NO tiene description
- * manual y necesitamos construir uno desde el material/color.
- *
- * Mantenemos estos mappings aquí (no en messages.json) porque solo
- * se usan en metadata server-side, no en el UI visible.
+ * Labels de material y color por idioma. Solo se usan para armar la
+ * descripción SEO cuando un producto no tiene descripción propia.
  */
 const MATERIAL_LABELS_ES: Record<string, string> = {
   "plata-925": "plata 925",
@@ -146,42 +127,49 @@ const COLOR_LABELS_EN: Record<string, string> = {
   multicolor: "multicolor",
 };
 
+/**
+ * Textos de material/color resueltos al idioma (para la descripción SEO).
+ * Se usa en generateMetadata y en la página, por eso vive en una función.
+ */
+function getMaterialColorText(product: Product, locale: Locale) {
+  const materialLabels =
+    locale === "en" ? MATERIAL_LABELS_EN : MATERIAL_LABELS_ES;
+  const colorLabels = locale === "en" ? COLOR_LABELS_EN : COLOR_LABELS_ES;
+  return {
+    materialText: materialLabels[product.material] ?? product.material,
+    colorText: colorLabels[product.color] ?? product.color,
+  };
+}
+
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getProductDetail(slug);
 
   if (!product) {
     return { title: "Producto no encontrado" };
   }
 
-  /**
-   * Resolver al locale activo.
-   * En metadata, generateMetadata es async así que getLocale() funciona aquí.
-   */
   const locale = (await getLocale()) as Locale;
-  const extras = getExtras(product);
 
   const productName = getLocalized(product.name, locale);
-  const detailsDescription = getLocalized(extras.description, locale);
-
-  const materialLabels = locale === "en" ? MATERIAL_LABELS_EN : MATERIAL_LABELS_ES;
-  const colorLabels = locale === "en" ? COLOR_LABELS_EN : COLOR_LABELS_ES;
-  const materialText = materialLabels[product.material] ?? product.material;
-  const colorText = colorLabels[product.color] ?? product.color;
+  const detailsDescription = getLocalized(product.description, locale);
+  const { materialText, colorText } = getMaterialColorText(product, locale);
 
   const description = buildProductDescription(
     product,
     productName,
     detailsDescription,
     materialText,
-    colorText
+    colorText,
   );
 
+  // Imagen para compartir: las rutas locales ("/placeholder-…") se vuelven
+  // absolutas; las de Supabase Storage ya son URLs completas.
   const imageUrl = product.images[0]?.src.startsWith("/")
     ? absoluteUrl(product.images[0].src)
-    : product.images[0]?.src ?? absoluteUrl("/og-default.svg");
+    : (product.images[0]?.src ?? absoluteUrl("/og-default.svg"));
 
   const productUrl = absoluteUrl(`/productos/${product.slug}`);
 
@@ -226,78 +214,60 @@ export async function generateMetadata({
 
 export default async function ProductDetailPage({ params }: PageProps) {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
 
-  if (!product) {
+  // Producto completo desde la base (null si no existe o está retirado).
+  const productFromDb = await getProductDetail(slug);
+  if (!productFromDb) {
     notFound();
   }
 
-  /**
-   * Resolver al locale activo para el server-side rendering.
-   * Los componentes Client (ProductInfo, ProductAccordion) resuelven
-   * por su cuenta con useLocale, pero aquí necesitamos resolver para:
-   *   - structured data (JSON-LD)
-   *   - breadcrumb URL
-   *   - category label en el breadcrumb visual
-   */
   const locale = (await getLocale()) as Locale;
 
-  const extras = getExtras(product);
-  const productDetail = { ...product, ...extras };
+  /**
+   * Reseñas (datos de muestra, ver punto 4 de la cabecera). Se cargan en el
+   * servidor para que vayan en el HTML inicial (mejor SEO y carga inmediata).
+   */
+  const initialReviews = getReviewsByProduct(productFromDb.slug);
+  const initialStats = calculateReviewStats(productFromDb.slug);
 
-  // Datos pre-resueltos para meta tags y structured data
+  // Estrellitas de arriba = las mismas reseñas que se muestran abajo.
+  const reviewCount = initialReviews.length;
+  const averageRating =
+    reviewCount > 0
+      ? Math.round(
+          (initialReviews.reduce((sum, review) => sum + review.rating, 0) /
+            reviewCount) *
+            10,
+        ) / 10
+      : 0;
+
+  const product = { ...productFromDb, averageRating, reviewCount };
+
+  // Datos pre-resueltos para metadata y datos estructurados.
   const productName = getLocalized(product.name, locale);
-  const detailsDescription = getLocalized(extras.description, locale);
-
-  const materialLabels = locale === "en" ? MATERIAL_LABELS_EN : MATERIAL_LABELS_ES;
-  const colorLabels = locale === "en" ? COLOR_LABELS_EN : COLOR_LABELS_ES;
-  const materialText = materialLabels[product.material] ?? product.material;
-  const colorText = colorLabels[product.color] ?? product.color;
+  const detailsDescription = getLocalized(product.description, locale);
+  const { materialText, colorText } = getMaterialColorText(product, locale);
 
   const description = buildProductDescription(
     product,
     productName,
     detailsDescription,
     materialText,
-    colorText
+    colorText,
   );
 
-  /**
-   * Pre-cargar reseñas SERVER-SIDE.
-   * Los datos están en el HTML inicial → mejor SEO + carga inmediata.
-   */
-  const initialReviews = getReviewsByProduct(product.slug);
-  const initialStats = calculateReviewStats(product.slug);
+  // Hasta 4 productos visibles de la misma categoría, sin el actual.
+  const related = await getRelatedProducts(product.slug, product.category, 4);
 
-  // Productos relacionados de la misma categoría, sin el actual
-  const related = getProductsByCategory(product.category)
-    .filter((p) => p.slug !== product.slug)
-    .slice(0, 4);
-
-  /**
-   * Structured Data.
-   *
-   * Pasamos productName ya resuelto al schema en lugar de product
-   * porque productSchema espera strings, no LocalizedString.
-   *
-   * NOTA IMPORTANTE: si productSchema en lib/jsonld.ts aún espera un Product
-   * con name como string, va a fallar igual. Asumo que esa función
-   * recibe el name como argumento separado o ya está adaptada. Si no,
-   * tendremos que ajustar también lib/jsonld.ts.
-   */
+  // Datos estructurados del producto (para Google).
   const productJsonLd = productSchema(
     product,
     initialReviews,
     initialStats,
-    description
+    description,
   );
 
-  /**
-   * Breadcrumb: usamos productName ya resuelto.
-   * Para la categoría, sería ideal traducirla aquí también, pero
-   * mantenemos el valor del enum (en español) por simplicidad — Google
-   * lo entenderá igual.
-   */
+  // Migas de pan para SEO. La categoría va con su enum en español.
   const breadcrumbJsonLd = breadcrumbSchema([
     { name: "Inicio", url: SITE_URL },
     {
@@ -309,7 +279,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
   return (
     <>
-      {/* Structured Data global */}
+      {/* Structured Data */}
       <JsonLd data={productJsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
 
@@ -328,23 +298,20 @@ export default async function ProductDetailPage({ params }: PageProps) {
       <Container>
         <div className="pb-16">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-            <ProductGallery
-              images={product.images}
-              productName={productName}
-            />
+            <ProductGallery images={product.images} productName={productName} />
 
             <div>
-              {/* ProductInfo es Client Component: resuelve con useLocale */}
-              <ProductInfo product={productDetail} />
+              {/* ProductInfo (navegador): resuelve el idioma con useLocale */}
+              <ProductInfo product={product} />
 
               <div className="mt-8">
-                {/* ProductActions trabaja con Product base */}
+                {/* ProductActions: carrito, wishlist y apartado */}
                 <ProductActions product={product} />
               </div>
 
               <div className="mt-8">
-                {/* ProductAccordion es Client Component: resuelve con useLocale */}
-                <ProductAccordion product={productDetail} />
+                {/* ProductAccordion (navegador): descripción, medidas, cuidados */}
+                <ProductAccordion product={product} />
               </div>
             </div>
           </div>

@@ -1,7 +1,17 @@
 /**
  * ============================================================================
- * REGISTER FORM — KATALINA (Fase 12 Turno 3B.4: bilingüe completo)
+ * REGISTER FORM — MKATALINA (Fase 13 · Etapa 6C: confirmación de correo)
  * ============================================================================
+ *
+ * CAMBIO DE LA ETAPA 6C:
+ *   Con la confirmación de correo activada en Supabase, crear la cuenta ya
+ *   NO inicia sesión. Si register() responde needsConfirmation = true, el
+ *   formulario se reemplaza por el aviso "Revisa tu correo"
+ *   (CheckEmailNotice.tsx, con botón para reenviar) en lugar de redirigir.
+ *   Si la confirmación estuviera desactivada, todo funciona como antes
+ *   (toast de bienvenida y redirección).
+ *
+ * ─── Historial ───────────────────────────────────────────────────────
  *
  * Cambios respecto a la versión anterior:
  *   - Imports actualizados: Link y useRouter desde "@/i18n/navigation"
@@ -77,6 +87,7 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { Eye, EyeOff, AlertCircle, Check, Circle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { CheckEmailNotice } from "@/components/auth/CheckEmailNotice";
 import { PASSWORD_RULES } from "@/data/mock-users";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -178,6 +189,8 @@ export function RegisterForm() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Etapa 6C: correo al que se mandó la confirmación (muestra el aviso).
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
   const updateField = <K extends keyof FormData>(
     field: K,
@@ -217,7 +230,11 @@ export function RegisterForm() {
       lastName: formData.lastName,
     });
 
-    if (result.success) {
+    if (result.success && result.needsConfirmation) {
+      // Etapa 6C: falta confirmar el correo → aviso "Revisa tu correo".
+      setPendingEmail(formData.email.trim().toLowerCase());
+      setIsSubmitting(false);
+    } else if (result.success) {
       toast.success(tRegister("toastSuccessTitle"), {
         description: tRegister("toastSuccessDescription"),
       });
@@ -243,6 +260,11 @@ export function RegisterForm() {
       "focus:outline-none focus:border-ring transition-colors",
       errors[field] && "border-destructive"
     );
+
+  // Etapa 6C: cuenta creada, falta confirmar el correo.
+  if (pendingEmail) {
+    return <CheckEmailNotice email={pendingEmail} />;
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">

@@ -1,7 +1,12 @@
 /**
  * ============================================================================
- * CHECKOUT SUMMARY — MKATALINA (Fase 13 · Etapa 4: botón de pago como slot)
+ * CHECKOUT SUMMARY — MKATALINA (Fase 13 · Etapas 4 y 7)
  * ============================================================================
+ *
+ * Etapa 7: nueva prop opcional `notice` (texto) que se muestra justo encima
+ * de los botones de pago. La página la usa para el aviso de impuestos de
+ * importación en compras al extranjero, para que el cliente lo vea ANTES de
+ * pagar.
  *
  * Cambio de esta etapa:
  *   - Ya no recibe onPay/isProcessing ni renderiza un botón simulado. Ahora
@@ -19,7 +24,7 @@
 
 import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
-import { ShieldCheck } from "lucide-react";
+import { Info, ShieldCheck } from "lucide-react";
 import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { getLocalized } from "@/lib/i18n-helpers";
@@ -34,6 +39,8 @@ interface CheckoutSummaryProps {
   total: number;
   /** El botón de pago (PayPal). Lo arma la página del checkout. */
   paymentButton: React.ReactNode;
+  /** Aviso opcional sobre los botones de pago (Etapa 7: aduanas). */
+  notice?: string;
 }
 
 export function CheckoutSummary({
@@ -42,6 +49,7 @@ export function CheckoutSummary({
   shippingMethod,
   total,
   paymentButton,
+  notice,
 }: CheckoutSummaryProps) {
   const locale = useLocale() as Locale;
   const t = useTranslations("checkout.summary");
@@ -127,7 +135,15 @@ export function CheckoutSummary({
         </span>
       </div>
 
-      {/* Botón de pago (PayPal) — provisto por la página del checkout */}
+      {/* Aviso antes de pagar (Etapa 7: impuestos de importación) */}
+      {notice && (
+        <p className="flex items-start gap-2 rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
+          <Info className="h-4 w-4 flex-shrink-0 text-accent" aria-hidden="true" />
+          <span>{notice}</span>
+        </p>
+      )}
+
+      {/* Botones de pago — provistos por la página del checkout */}
       <div>{paymentButton}</div>
 
       {/* Aviso de seguridad */}

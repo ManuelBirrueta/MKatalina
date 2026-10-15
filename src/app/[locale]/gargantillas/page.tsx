@@ -1,18 +1,26 @@
 /**
  * ============================================================================
- * PAGE: /[locale]/gargantillas — KATALINA (Fase 12 Turno 3B.3: bilingüe)
+ * PAGE: /[locale]/gargantillas — MKATALINA (Fase 13 · Etapa 3: productos desde la base)
  * ============================================================================
  *
- * Esta página es IDÉNTICA estructuralmente a /aretes. La única diferencia
- * es el valor de la categoría que se pasa a CategoryPage y a los schemas.
+ * Página de la categoría "Gargantillas". Es un componente de SERVIDOR que:
+ *   1. Lee de la base los productos visibles de la categoría
+ *      (getProductsByCategory de src/lib/products-db.ts).
+ *   2. Arma los datos estructurados para buscadores (migas de pan + lista).
+ *   3. Le PASA esos productos a <CategoryPage>, que pinta la cuadrícula con
+ *      filtros, orden y paginación en el navegador.
  *
- * Toda la lógica visual + textos visibles los resuelve CategoryPage usando
- * los namespaces de messages.json:
- *   - product.categories.Gargantillas → "Gargantillas" / "Chokers"
- *   - catalog.categoryDescriptions.Gargantillas → descripción editorial
- *   - catalog.metaDescriptions.Gargantillas → meta description SEO
+ * CAMBIO DE ESTA ETAPA:
+ *   - Antes: getProductsByCategory venía de src/data/products.ts (código) y
+ *     CategoryPage volvía a buscar los productos por su cuenta.
+ *   - Ahora: se leen UNA vez aquí, desde la base, y se pasan como prop.
+ *     (El navegador no puede consultar la base; el servidor sí.)
  *
- * Ver aretes/page.tsx para comentarios extensos sobre el patrón general.
+ * `dynamic = "force-dynamic"`: la página se genera en CADA visita. Sin esto,
+ * Next.js podría congelarla al compilar y un producto agregado, editado o
+ * agotado desde el panel no se vería hasta el siguiente despliegue.
+ *
+ * generateMetadata (título y descripción SEO bilingües) no cambia.
  * ============================================================================
  */
 
@@ -20,9 +28,12 @@ import type { Metadata } from "next";
 import { getTranslations, getLocale } from "next-intl/server";
 import { CategoryPage } from "@/components/shop/CategoryPage";
 import { JsonLd } from "@/components/seo/JsonLd";
-import { getProductsByCategory } from "@/data/products";
-import { absoluteUrl, SITE_URL } from "@/lib/seo";
+import { getProductsByCategory } from "@/lib/products-db";
+import { absoluteUrl, SITE_URL, SITE_NAME } from "@/lib/seo";
 import { breadcrumbSchema, itemListSchema } from "@/lib/jsonld";
+
+// Leer la base en cada visita (ver la cabecera).
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -40,6 +51,7 @@ export async function generateMetadata({
     namespace: "catalog",
   });
 
+  // Título y descripción de la categoría, traducidos según el idioma.
   const categoryTitle = tProduct("categories.Gargantillas");
   const metaDescription = tCatalog("metaDescriptions.Gargantillas");
 
@@ -50,7 +62,8 @@ export async function generateMetadata({
       canonical: absoluteUrl("/gargantillas"),
     },
     openGraph: {
-      title: `${categoryTitle} · Katalina`,
+      // SITE_NAME viene de lib/seo.ts: el nombre de marca vive en un solo lugar.
+      title: `${categoryTitle} · ${SITE_NAME}`,
       description: metaDescription,
       url: absoluteUrl("/gargantillas"),
     },
@@ -68,16 +81,19 @@ export default async function GargantillasPage() {
     namespace: "breadcrumb",
   });
 
-  const products = getProductsByCategory("Gargantillas");
+  // Productos visibles de "Gargantillas", leídos de la base (ahora es asíncrono).
+  const products = await getProductsByCategory("Gargantillas");
 
   const homeLabel = tBreadcrumb("home");
   const categoryTitle = tProduct("categories.Gargantillas");
 
+  // Migas de pan para SEO: Inicio → Gargantillas.
   const breadcrumbJsonLd = breadcrumbSchema([
     { name: homeLabel, url: SITE_URL },
     { name: categoryTitle, url: absoluteUrl("/gargantillas") },
   ]);
 
+  // Lista de productos en formato de datos estructurados (para buscadores).
   const itemListJsonLd = itemListSchema(products, categoryTitle);
 
   return (
@@ -85,7 +101,8 @@ export default async function GargantillasPage() {
       <JsonLd data={breadcrumbJsonLd} />
       <JsonLd data={itemListJsonLd} />
 
-      <CategoryPage category="Gargantillas" />
+      {/* Los productos viajan como prop: CategoryPage ya no los busca. */}
+      <CategoryPage category="Gargantillas" products={products} />
     </>
   );
 }

@@ -11,11 +11,16 @@
 //
 //  DECISIÓN DE ARQUITECTURA CLAVE
 //  ------------------------------
-//  Los 24 PRODUCTOS SIGUEN EN CÓDIGO (en src/data/products.ts). La base de
-//  datos NO tiene tabla de productos. En su lugar, cada dato dinámico que
-//  necesita "apuntar" a un producto guarda un `productSlug` (un texto, ej.
-//  "aretes-luna-plata"). Así el catálogo lo controla el código y la BD solo
-//  guarda lo que cambia: usuarios, pedidos, apartados, reseñas, etc.
+//  Los PRODUCTOS VIVEN EN LA BASE DE DATOS (modelos Product y ProductImage, al
+//  final de este archivo) para que un administrador pueda crearlos y editarlos
+//  desde el panel, con sus imágenes. (Antes estaban en src/data/products.ts;
+//  se migraron con un script de seed.)
+//
+//  Aun así, los demás modelos (pedidos, apartados, reseñas, wishlist, carrito)
+//  SIGUEN apuntando al producto con un `productSlug` de texto, SIN llave
+//  foránea. Es a propósito: un pedido o apartado es una factura histórica y
+//  debe sobrevivir aunque el producto se oculte o cambie. Por eso, a un
+//  producto que ya tuvo ventas se le OCULTA (isActive = false), no se borra.
 //
 //  PRINCIPIO DE "SNAPSHOT INMUTABLE"
 //  ---------------------------------
@@ -198,6 +203,15 @@ model Order {
   locale        String      @default("es")
   paypalOrderId String? // para el pago real (paso 2)
 
+  // ── Envío (Fase 13 · Etapa 6B) ─────────────────────────────────────────
+  // Se llenan cuando el admin marca el pedido como ENVIADO / ENTREGADO.
+  // carrier: "estafeta" | "dhl" | "local" (ver src/lib/shipping-carriers.ts).
+  carrier        String?
+  // Número de guía de la paquetería (null en entrega local).
+  trackingNumber String?
+  shippedAt      DateTime?
+  deliveredAt    DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -248,7 +262,7 @@ model OrderItem {
 //  código de la Etapa 4, no aquí.
 // ============================================================================
 model Reservation {
-  id String @id // "APTD-XXXXXX", generado en el cliente (por ahora)
+  id String @id // "APTD-XXXXXX", generado en el servidor al cobrar el anticipo
 
   profileId String  @db.Uuid
   profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
@@ -271,8 +285,35 @@ model Reservation {
   expiresAt   DateTime
   completedAt DateTime?
 
-  // Para el pago real del anticipo (se llena en la Etapa 4).
+  // Orden de PayPal con la que se cobró el ANTICIPO (20%).
   paypalOrderId String?
+
+  // Idioma en que se hizo el apartado ("es" | "en"), para que los correos
+  // lleguen en ese idioma (Etapa 6B). Los apartados viejos quedan en "es".
+  locale String @default("es")
+
+  // ── Liquidación del 80% restante (Fase 13 · Etapa 5) ──────────────────
+  // Se llenan cuando el cliente completa el apartado pagando con PayPal.
+  // Si el admin lo marca COMPLETADO a mano (pago en persona), quedan vacíos:
+  // así el panel distingue "pagado en línea" de "pagado en tienda".
+
+  // Orden de PayPal con la que se cobró el resto (+ envío, si aplica).
+  completionPaypalOrderId String?
+  // Método de envío del checkout ("estandar" | "express"); null = recoger.
+  shippingMethodId        String?
+  // Costo del envío cobrado, en pesos enteros (0 = recoger en tienda).
+  shippingCost            Int     @default(0)
+  // Dirección de envío CONGELADA al completar (nombre, teléfono, calle,
+  // colonia, ciudad, estado, CP, notas). JSON por ser un "documento" que no
+  // cambia aunque el cliente edite después sus datos. null = recoger.
+  shippingAddress         Json?
+
+  // ── Envío de la pieza (Etapa 6B) ───────────────────────────────────────
+  // Solo en apartados liquidados con envío, cuando el admin los marca como
+  // enviados. Mismos valores que en Order.
+  carrier        String?
+  trackingNumber String?
+  shippedAt      DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -351,4 +392,109 @@ model CartItem {
   @@unique([profileId, productSlug])
   @@index([profileId])
   @@map("cart_items")
+}
+
+// ============================================================================
+//  MODELO: Product  (Producto del catálogo)
+// ----------------------------------------------------------------------------
+//  Un producto en venta. Reemplaza a los objetos de src/data/products.ts y
+//  product-details.ts: aquí vive TODO lo que antes estaba repartido entre el
+//  tipo Product (listados) y ProductDetail (página de detalle).
+//
+//  BILINGÜE: nombre y descripción se guardan en dos columnas (…Es / …En). El
+//  código las junta de nuevo en un LocalizedString { es, en } para no tener
+//  que cambiar los componentes que ya usan getLocalized().
+//
+//  STOCK: `stock` es la cantidad disponible. "inStock" ya NO se guarda: se
+//  calcula como stock > 0, para que nunca se contradigan. Lo mismo con el
+//  badge "agotado": se muestra solo cuando stock = 0.
+// ============================================================================
+model Product {
+  // Se conserva el id que ya tenía cada producto en código (el seed lo copia);
+  // los productos nuevos reciben un UUID automático.
+  id   String @id @default(uuid())
+  slug String @unique // identificador en la URL y en pedidos/carrito (ej. "aretes-camelia")
+
+  // Textos bilingües. "Es" y "En" en lugar de un campo JSON: son más fáciles
+  // de consultar, validar y mostrar en el formulario del admin.
+  nameEs        String
+  nameEn        String
+  descriptionEs String @db.Text // puede traer \n para separar párrafos
+  descriptionEn String @db.Text
+
+  // Claves tipadas en el código (ProductCategory / ProductMaterial /
+  // ProductColor). Se guardan como texto y se validan contra esas listas al
+  // crear o editar, así agregar una categoría nueva NO exige migrar la BD.
+  category String // "Aretes" | "Collares" | "Pulseras" | "Gargantillas"
+  material String // "plata-925" | "oro-rosa" | ...
+  color    String // "dorado" | "plateado" | ...
+
+  // Precios en pesos enteros (igual que en Order y Reservation).
+  price         Int
+  originalPrice Int? // precio antes de la oferta; null = sin oferta
+
+  // Etiqueta editorial opcional: "nuevo" | "oferta" | "limitado".
+  // ("agotado" no se guarda: se deduce de stock = 0.)
+  badge String?
+
+  // Inventario. Se descuenta al pagar un pedido y al apartar (Etapa 3).
+  stock Int @default(0)
+
+  // false = oculto en la tienda (borrador o retirado) pero conservado para el
+  // historial. Se usa en lugar de borrar productos que ya tuvieron ventas.
+  isActive Boolean @default(true)
+
+  // Dimensiones físicas, todas opcionales. Los números son universales; solo
+  // las notas se traducen.
+  lengthCm        Float?
+  widthCm         Float?
+  heightCm        Float?
+  weightG         Float?
+  dimensionNotesEs String?
+  dimensionNotesEn String?
+
+  // Instrucciones de cuidado: una lista por idioma (arreglos nativos de Postgres).
+  careInstructionsEs String[]
+  careInstructionsEn String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  images ProductImage[]
+
+  // Índices para las consultas más comunes: listar por categoría solo lo
+  // visible, y mostrar lo más nuevo primero.
+  @@index([category, isActive])
+  @@index([createdAt])
+  @@map("products")
+}
+
+// ============================================================================
+//  MODELO: ProductImage  (Imagen de un producto)
+// ----------------------------------------------------------------------------
+//  Un producto tiene varias imágenes ordenadas; la de `position` 0 es la
+//  principal (la que sale en tarjetas y listados).
+//
+//  `url` es lo que usa la tienda para mostrarla: puede ser una ruta local
+//  ("/placeholder-…", como las actuales) o la URL pública de Supabase Storage
+//  cuando el admin sube una foto real.
+//  `storagePath` guarda la ruta dentro del bucket de Storage (null en los
+//  placeholders) para poder BORRAR el archivo cuando se elimine la imagen y no
+//  dejar archivos huérfanos ocupando espacio.
+// ============================================================================
+model ProductImage {
+  id        String  @id @default(uuid())
+  productId String
+  // onDelete: Cascade → si se borra el producto, se borran sus filas de imagen.
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  url         String
+  alt         String   @default("") // texto alternativo (accesibilidad y SEO)
+  position    Int      @default(0) // orden de aparición; 0 = principal
+  storagePath String? // ruta en el bucket de Supabase Storage (null = no está en Storage)
+
+  createdAt DateTime @default(now())
+
+  @@index([productId, position]) // traer las imágenes de un producto ya ordenadas
+  @@map("product_images")
 }

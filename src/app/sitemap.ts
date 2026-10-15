@@ -1,61 +1,36 @@
 /**
  * ============================================================================
- * SITEMAP — MKATALINA (Fase 12 Turno 3A: multilingüe)
+ * SITEMAP — MKATALINA (Fase 13 · Etapa 3: productos desde la base)
  * ============================================================================
  *
- * Generador de sitemap.xml dinámico que se sirve en /sitemap.xml.
+ * Generador de sitemap.xml dinámico que se sirve en /sitemap.xml. Cada URL
+ * aparece en AMBOS idiomas (/es/... y /en/...) con sus `alternates.languages`
+ * (tags <xhtml:link rel="alternate" hreflang="...">), para que Google entienda
+ * qué versiones bilingües existen de cada página.
  *
- * Cambios respecto a la versión anterior:
- *   - Cada URL aparece en AMBOS idiomas (/es/... y /en/...)
- *   - Cada entrada incluye `alternates.languages` que genera tags
- *     <xhtml:link rel="alternate" hreflang="..."> en el XML
- *   - Resultado: el sitemap declara explícitamente a Google qué versiones
- *     bilingues existen de cada página
+ * CAMBIO DE ESTA ETAPA:
+ *   - Los productos ya no salen de src/data/products.ts sino de la base
+ *     (getAllProductSlugs de src/lib/products-db.ts): solo los VISIBLES.
+ *     Un producto retirado desde el panel deja de anunciarse a Google.
+ *   - Por eso la función ahora es `async`.
+ *   - `revalidate = 3600`: el sitemap se regenera como máximo cada hora. Los
+ *     buscadores lo leen de vez en cuando, así que no hace falta en cada visita.
  *
- * Estructura del sitemap.xml resultante:
- *
- *   <url>
- *     <loc>https://Mkatalina.mx/es/aretes</loc>
- *     <lastmod>2026-06-04</lastmod>
- *     <xhtml:link rel="alternate" hreflang="es" href="https://Mkatalina.mx/es/aretes" />
- *     <xhtml:link rel="alternate" hreflang="en" href="https://Mkatalina.mx/en/aretes" />
- *     <xhtml:link rel="alternate" hreflang="x-default" href="https://Mkatalina.mx/es/aretes" />
- *   </url>
- *   <url>
- *     <loc>https://Mkatalina.mx/en/aretes</loc>
- *     ... (mismas alternates)
- *   </url>
- *
- * Google usa este sitemap para:
- *   - Descubrir todas las URLs del sitio
- *   - Entender la relación bilingüe entre URLs
- *   - Decidir qué versión mostrar a cada usuario según su idioma
- *
- * Volumen del sitemap:
- *   - 4 categorías × 2 idiomas = 8 URLs
- *   - 24 productos × 2 idiomas = 48 URLs
- *   - 6 páginas estáticas × 2 idiomas = 12 URLs
- *   - 2 homes (es y en) = 2 URLs
- *   Total: ~70 URLs. Bien dentro del límite de 50,000 URLs/sitemap.
+ * Lo demás (home, categorías, páginas estáticas, alternates) no cambia.
  * ============================================================================
  */
 
 import type { MetadataRoute } from "next";
-import { productsData } from "@/data/products";
+import { getAllProductSlugs } from "@/lib/products-db";
 import { routing } from "@/i18n/routing";
 import { SITE_URL } from "@/lib/seo";
 
+// Regenerar como máximo cada hora (ver la cabecera).
+export const revalidate = 3600;
+
 /**
- * Helper: construye el mapping de alternates para una path canónico.
- *
- * Recibe un path como "/aretes" y devuelve:
- *   {
- *     es: "https://Mkatalina.mx/es/aretes",
- *     en: "https://Mkatalina.mx/en/aretes"
- *   }
- *
- * Cuando se pasa este objeto en `alternates.languages`, Next.js
- * automáticamente genera los tags xhtml:link en el XML.
+ * Construye el mapping de alternates para un path canónico.
+ * "/aretes" → { es: "https://…/es/aretes", en: "https://…/en/aretes" }
  */
 function buildLanguageAlternates(path: string): Record<string, string> {
   const alternates: Record<string, string> = {};
@@ -66,20 +41,15 @@ function buildLanguageAlternates(path: string): Record<string, string> {
 }
 
 /**
- * Genera una entrada del sitemap para CADA locale soportado.
- *
- * Por cada path canónico (ej. "/aretes"), genera N entradas:
- *   - /es/aretes
- *   - /en/aretes
- *
- * Cada entrada incluye sus alternates apuntando a todas las versiones.
+ * Genera una entrada del sitemap por CADA idioma para un path canónico
+ * (ej. "/aretes" → /es/aretes y /en/aretes), cada una con sus alternates.
  */
 function generateEntriesForPath(
   path: string,
   options: {
     priority?: number;
     changeFrequency?: MetadataRoute.Sitemap[number]["changeFrequency"];
-  } = {}
+  } = {},
 ): MetadataRoute.Sitemap {
   const { priority = 0.7, changeFrequency = "weekly" } = options;
   const alternates = buildLanguageAlternates(path);
@@ -95,7 +65,7 @@ function generateEntriesForPath(
   }));
 }
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   /* ─── HOME por cada locale ─── */
   const homeEntries: MetadataRoute.Sitemap = routing.locales.map((locale) => ({
     url: `${SITE_URL}/${locale}`,
@@ -110,15 +80,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
   /* ─── CATEGORÍAS de productos ─── */
   const categoryPaths = ["/aretes", "/collares", "/pulseras", "/gargantillas"];
   const categoryEntries = categoryPaths.flatMap((path) =>
-    generateEntriesForPath(path, { priority: 0.9, changeFrequency: "daily" })
+    generateEntriesForPath(path, { priority: 0.9, changeFrequency: "daily" }),
   );
 
-  /* ─── PRODUCTOS individuales ─── */
-  const productEntries = productsData.flatMap((product) =>
-    generateEntriesForPath(`/productos/${product.slug}`, {
+  /* ─── PRODUCTOS individuales (solo los visibles, desde la base) ─── */
+  const productSlugs = await getAllProductSlugs();
+  const productEntries = productSlugs.flatMap((slug) =>
+    generateEntriesForPath(`/productos/${slug}`, {
       priority: 0.8,
       changeFrequency: "weekly",
-    })
+    }),
   );
 
   /* ─── PÁGINAS ESTÁTICAS ─── */
@@ -131,7 +102,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/terminos",
   ];
   const staticEntries = staticPaths.flatMap((path) =>
-    generateEntriesForPath(path, { priority: 0.5, changeFrequency: "monthly" })
+    generateEntriesForPath(path, { priority: 0.5, changeFrequency: "monthly" }),
   );
 
   return [

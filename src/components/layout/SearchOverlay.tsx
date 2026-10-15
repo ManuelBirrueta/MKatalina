@@ -4,18 +4,24 @@
  * ============================================================================
  *
  * Capa de búsqueda que se abre desde la lupa del header. Búsqueda 100% en el
- * cliente sobre los 24 productos (que viven en código): instantánea, sin
- * servidor ni librerías.
+ * navegador sobre el catálogo: instantánea, sin ir al servidor en cada tecla.
+ *
+ * CAMBIO DE LA ETAPA 3B:
+ *   - Los productos ya no salen de productsData (código) sino de useCatalog():
+ *     el catálogo VISIBLE que el layout lee de la base. Un producto agregado
+ *     desde el panel aparece en la búsqueda; uno retirado, desaparece.
+ *   - La miniatura muestra la FOTO real cuando el producto la tiene (las que
+ *     se suben al bucket de Supabase). Si es un placeholder, sigue mostrando
+ *     la inicial de la categoría, como antes.
  *
  * QUÉ BUSCA (y cómo)
  * ------------------
  * Arma un "texto de búsqueda" por producto: nombre es + nombre en + categoría +
  * material + color. Al comparar:
  *   - Ignora acentos: "rocio" encuentra "Rocío".
- *   - Convierte guiones en espacios: así "oro rosa" encuentra el material
- *     "oro-rosa", y "plata 925" encuentra "plata-925".
- *   - Busca POR PALABRAS: el producto debe contener TODAS las palabras que
- *     escribas, en cualquier orden ("oro rosa" y "rosa oro" dan lo mismo).
+ *   - Convierte guiones en espacios: "oro rosa" encuentra "oro-rosa".
+ *   - Busca POR PALABRAS: el producto debe contener TODAS las palabras, en
+ *     cualquier orden ("oro rosa" y "rosa oro" dan lo mismo).
  *
  * Los textos de la interfaz van en un objeto {es, en} aquí mismo (autónomo).
  * ============================================================================
@@ -24,10 +30,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { Search, X } from "lucide-react";
-import { productsData } from "@/data/products";
+import { useCatalog } from "@/components/providers/CatalogProvider";
 import { getLocalized } from "@/lib/i18n-helpers";
 import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -78,6 +85,9 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
   const locale = useLocale() as Locale;
   const t = locale === "en" ? COPY.en : COPY.es;
 
+  // Catálogo visible (de la base, vía el layout).
+  const { products } = useCatalog();
+
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -109,13 +119,13 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
     // Cada palabra de la búsqueda debe estar en el producto (en cualquier orden).
     const tokens = normalize(trimmed).split(" ").filter(Boolean);
     if (tokens.length === 0) return [];
-    return productsData.filter((product) => {
+    return products.filter((product) => {
       const haystack = normalize(
         `${product.name.es} ${product.name.en} ${product.category} ${product.material} ${product.color}`,
       );
       return tokens.every((token) => haystack.includes(token));
     });
-  }, [trimmed]);
+  }, [trimmed, products]);
 
   if (!open) return null;
 
@@ -178,40 +188,58 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
                   {results.length} {results.length === 1 ? t.one : t.many}
                 </p>
                 <ul className="pb-2">
-                  {results.map((product) => (
-                    <li key={product.id}>
-                      <Link
-                        href={product.href}
-                        onClick={onClose}
-                        className={cn(
-                          "flex items-center gap-3 px-4 py-3",
-                          "hover:bg-muted transition-colors",
-                        )}
-                      >
-                        {/* Placeholder de imagen (mismo patrón del resto del sitio) */}
-                        <div className="relative w-12 h-14 flex-shrink-0 bg-secondary-subtle overflow-hidden">
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                              {product.category[0]}
-                            </span>
+                  {results.map((product) => {
+                    const image = product.images[0];
+                    // Foto real = existe y no es uno de los placeholders locales.
+                    const hasRealImage =
+                      !!image && !image.src.startsWith("/placeholder");
+                    const productName = getLocalized(product.name, locale);
+
+                    return (
+                      <li key={product.id}>
+                        <Link
+                          href={product.href}
+                          onClick={onClose}
+                          className={cn(
+                            "flex items-center gap-3 px-4 py-3",
+                            "hover:bg-muted transition-colors",
+                          )}
+                        >
+                          {/* Miniatura: foto real o inicial de la categoría */}
+                          <div className="relative w-12 h-14 flex-shrink-0 bg-secondary-subtle overflow-hidden">
+                            {hasRealImage ? (
+                              <Image
+                                src={image.src}
+                                alt={image.alt || productName}
+                                fill
+                                sizes="48px"
+                                className="object-cover"
+                              />
+                            ) : (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                                  {product.category[0]}
+                                </span>
+                              </div>
+                            )}
                           </div>
-                        </div>
 
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {getLocalized(product.name, locale)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {product.category}
-                          </p>
-                        </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {productName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {product.category}
+                            </p>
+                          </div>
 
-                        <p className="text-sm font-medium tabular-nums whitespace-nowrap">
-                          {formatPrice(product.price)}
-                        </p>
-                      </Link>
-                    </li>
-                  ))}
+                          <p className="text-sm font-medium tabular-nums whitespace-nowrap">
+                            {formatPrice(product.price)}
+                          </p>
+                        </Link>
+                      </li>
+                    );
+                  })}
                 </ul>
               </>
             )}

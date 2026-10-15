@@ -1,7 +1,17 @@
 /**
  * ============================================================================
- * LOGIN FORM — KATALINA (Fase 12 Turno 3B.4: bilingüe completo)
+ * LOGIN FORM — MKATALINA (Fase 13 · Etapa 6C: correo y contraseña)
  * ============================================================================
+ *
+ * CAMBIOS DE LA ETAPA 6C:
+ *   - "¿Olvidaste tu contraseña?" ya lleva a /recuperar-contrasena (antes
+ *     mostraba un aviso de "próximamente").
+ *   - Si la cuenta existe pero aún no confirma su correo (errorCode
+ *     loginEmailNotConfirmed), se explica eso y se ofrece "Reenviar correo"
+ *     (useAuth().resendConfirmation), en lugar de "datos incorrectos".
+ *   Los textos nuevos viven en src/lib/account-copy.ts (es/en).
+ *
+ * ─── Historial ───────────────────────────────────────────────────────
  *
  * Cambios respecto a la versión anterior:
  *   - Imports actualizados:
@@ -53,13 +63,14 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { Eye, EyeOff, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { accountCopy } from "@/lib/account-copy";
 
 interface FormErrors {
   email?: string;
@@ -103,7 +114,9 @@ function validateField(
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login } = useAuth();
+  const { login, resendConfirmation } = useAuth();
+  // Textos nuevos de la Etapa 6C (src/lib/account-copy.ts).
+  const tAccount = accountCopy(useLocale());
 
   // 4 namespaces para los distintos tipos de textos
   const tLogin = useTranslations("auth.login");
@@ -119,6 +132,25 @@ export function LoginForm() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Etapa 6C: la cuenta existe pero falta confirmar el correo.
+  const [notConfirmed, setNotConfirmed] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
+
+  /** Reenvía el correo de confirmación al correo escrito. */
+  const handleResend = async () => {
+    setResending(true);
+    const result = await resendConfirmation(email);
+    setResending(false);
+    setResendMessage(
+      result.success
+        ? tAccount.resent
+        : result.errorCode === "rateLimited"
+          ? tAccount.rateLimited
+          : tAccount.sendError,
+    );
+  };
 
   const validateAll = (): boolean => {
     const newErrors: FormErrors = {};
@@ -157,6 +189,17 @@ export function LoginForm() {
        * Cast a any porque tErrors espera claves estáticas pero
        * nuestro código es dinámico.
        */
+      // Etapa 6C: correo sin confirmar → mensaje propio + botón reenviar.
+      // (Este código no está en auth.errors de messages, por eso va aparte.)
+      if (result.errorCode === "loginEmailNotConfirmed") {
+        setNotConfirmed(true);
+        setResendMessage(null);
+        setSubmitError(tAccount.notConfirmed);
+        setIsSubmitting(false);
+        return;
+      }
+      setNotConfirmed(false);
+
       const errorMessage = result.errorCode
         ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
           tErrors(result.errorCode as any)
@@ -189,7 +232,25 @@ export function LoginForm() {
           )}
         >
           <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-          <p>{submitError}</p>
+          <div className="space-y-2">
+            <p>{submitError}</p>
+            {/* Etapa 6C: reenviar el correo de confirmación */}
+            {notConfirmed && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void handleResend()}
+                  disabled={resending}
+                  className="text-sm font-medium underline underline-offset-4 disabled:opacity-50"
+                >
+                  {tAccount.resend}
+                </button>
+                {resendMessage && (
+                  <p className="text-xs text-foreground">{resendMessage}</p>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -235,19 +296,10 @@ export function LoginForm() {
           <label htmlFor="login-password" className="block text-sm font-medium">
             {tLogin("passwordLabel")}
           </label>
-          {/*
-           * Link "Olvidé mi contraseña" — placeholder por ahora.
-           * Muestra toast pending hasta que tengamos email real.
-           */}
+          {/* Etapa 6C: lleva a la página real de recuperación. */}
           <Link
             href="/recuperar-contrasena"
             className="text-xs text-muted-foreground hover:text-accent transition-colors"
-            onClick={(e) => {
-              e.preventDefault();
-              toast.info(tLogin("forgotToastTitle"), {
-                description: tLogin("forgotToastDescription"),
-              });
-            }}
           >
             {tLogin("forgotPassword")}
           </Link>

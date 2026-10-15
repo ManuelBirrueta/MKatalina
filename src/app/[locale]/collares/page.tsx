@@ -1,22 +1,26 @@
 /**
  * ============================================================================
- * PAGE: /[locale]/collares — MKATALINA (rebrand: openGraph actualizado)
+ * PAGE: /[locale]/collares — MKATALINA (Fase 13 · Etapa 3: productos desde la base)
  * ============================================================================
  *
- * Cambio respecto a la versión anterior:
- *   - openGraph.title: "${categoryTitle} · Katalina" → "${categoryTitle} · MKatalina"
+ * Página de la categoría "Collares". Es un componente de SERVIDOR que:
+ *   1. Lee de la base los productos visibles de la categoría
+ *      (getProductsByCategory de src/lib/products-db.ts).
+ *   2. Arma los datos estructurados para buscadores (migas de pan + lista).
+ *   3. Le PASA esos productos a <CategoryPage>, que pinta la cuadrícula con
+ *      filtros, orden y paginación en el navegador.
  *
- * Lo que NO cambia:
- *   - generateMetadata async para metadata bilingüe
- *   - params como Promise<{ locale }> en Next.js 15+
- *   - Structured data (BreadcrumbList + ItemList) con labels traducidos
- *   - CategoryPage simplificado a una sola línea
+ * CAMBIO DE ESTA ETAPA:
+ *   - Antes: getProductsByCategory venía de src/data/products.ts (código) y
+ *     CategoryPage volvía a buscar los productos por su cuenta.
+ *   - Ahora: se leen UNA vez aquí, desde la base, y se pasan como prop.
+ *     (El navegador no puede consultar la base; el servidor sí.)
  *
- * El openGraph.title aparece cuando alguien comparte la URL de esta página
- * en WhatsApp, Twitter, Facebook, etc. Antes mostraba "Aretes · Katalina",
- * ahora muestra "Aretes · MKatalina".
+ * `dynamic = "force-dynamic"`: la página se genera en CADA visita. Sin esto,
+ * Next.js podría congelarla al compilar y un producto agregado, editado o
+ * agotado desde el panel no se vería hasta el siguiente despliegue.
  *
- * Ver aretes/page.tsx para comentarios extensos sobre el patrón general.
+ * generateMetadata (título y descripción SEO bilingües) no cambia.
  * ============================================================================
  */
 
@@ -24,9 +28,12 @@ import type { Metadata } from "next";
 import { getTranslations, getLocale } from "next-intl/server";
 import { CategoryPage } from "@/components/shop/CategoryPage";
 import { JsonLd } from "@/components/seo/JsonLd";
-import { getProductsByCategory } from "@/data/products";
+import { getProductsByCategory } from "@/lib/products-db";
 import { absoluteUrl, SITE_URL, SITE_NAME } from "@/lib/seo";
 import { breadcrumbSchema, itemListSchema } from "@/lib/jsonld";
+
+// Leer la base en cada visita (ver la cabecera).
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -44,6 +51,7 @@ export async function generateMetadata({
     namespace: "catalog",
   });
 
+  // Título y descripción de la categoría, traducidos según el idioma.
   const categoryTitle = tProduct("categories.Collares");
   const metaDescription = tCatalog("metaDescriptions.Collares");
 
@@ -54,11 +62,7 @@ export async function generateMetadata({
       canonical: absoluteUrl("/collares"),
     },
     openGraph: {
-      /**
-       * Usamos SITE_NAME importado de lib/seo.ts (ya rebrandeado a "MKatalina")
-       * en lugar de hardcodear el nombre. Esto garantiza que si en el futuro
-       * cambia de nuevo el nombre, solo se actualiza en un lugar.
-       */
+      // SITE_NAME viene de lib/seo.ts: el nombre de marca vive en un solo lugar.
       title: `${categoryTitle} · ${SITE_NAME}`,
       description: metaDescription,
       url: absoluteUrl("/collares"),
@@ -77,16 +81,19 @@ export default async function CollaresPage() {
     namespace: "breadcrumb",
   });
 
-  const products = getProductsByCategory("Collares");
+  // Productos visibles de "Collares", leídos de la base (ahora es asíncrono).
+  const products = await getProductsByCategory("Collares");
 
   const homeLabel = tBreadcrumb("home");
   const categoryTitle = tProduct("categories.Collares");
 
+  // Migas de pan para SEO: Inicio → Collares.
   const breadcrumbJsonLd = breadcrumbSchema([
     { name: homeLabel, url: SITE_URL },
     { name: categoryTitle, url: absoluteUrl("/collares") },
   ]);
 
+  // Lista de productos en formato de datos estructurados (para buscadores).
   const itemListJsonLd = itemListSchema(products, categoryTitle);
 
   return (
@@ -94,7 +101,8 @@ export default async function CollaresPage() {
       <JsonLd data={breadcrumbJsonLd} />
       <JsonLd data={itemListJsonLd} />
 
-      <CategoryPage category="Collares" />
+      {/* Los productos viajan como prop: CategoryPage ya no los busca. */}
+      <CategoryPage category="Collares" products={products} />
     </>
   );
 }

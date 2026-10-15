@@ -1,25 +1,26 @@
 /**
  * ============================================================================
- * PAGE: /[locale]/aretes — MKATALINA
+ * PAGE: /[locale]/aretes — MKATALINA (Fase 13 · Etapa 3: productos desde la base)
  * ============================================================================
  *
- * CORRECCIÓN (Fase 13): este archivo tenía TODO el contenido de "Pulseras" por
- * un copiar-pegar, y por eso /aretes mostraba brazaletes. Se corrigió cada
- * referencia para que apunte a la categoría correcta ("Aretes") y a la ruta
- * "/aretes". El bug visible lo causaba getProductsByCategory("Pulseras");
- * las demás correcciones arreglan el título, la descripción SEO, las URLs
- * para compartir y los datos estructurados.
+ * Página de la categoría "Aretes". Es un componente de SERVIDOR que:
+ *   1. Lee de la base los productos visibles de la categoría
+ *      (getProductsByCategory de src/lib/products-db.ts).
+ *   2. Arma los datos estructurados para buscadores (migas de pan + lista).
+ *   3. Le PASA esos productos a <CategoryPage>, que pinta la cuadrícula con
+ *      filtros, orden y paginación en el navegador.
  *
- * Qué hace esta página:
- *   - generateMetadata async: metadata bilingüe (título + descripción para SEO)
- *   - params como Promise<{ locale }> (patrón de Next.js 15+)
- *   - Structured data (BreadcrumbList + ItemList) con textos traducidos
- *   - Renderiza <CategoryPage category="Aretes" />, el componente compartido
- *     que trae los productos de la categoría y pinta la cuadrícula, filtros,
- *     orden y paginación.
+ * CAMBIO DE ESTA ETAPA:
+ *   - Antes: getProductsByCategory venía de src/data/products.ts (código) y
+ *     CategoryPage volvía a buscar los productos por su cuenta.
+ *   - Ahora: se leen UNA vez aquí, desde la base, y se pasan como prop.
+ *     (El navegador no puede consultar la base; el servidor sí.)
  *
- * El openGraph.title es lo que se ve cuando alguien comparte la URL de esta
- * página en WhatsApp, Facebook, etc.
+ * `dynamic = "force-dynamic"`: la página se genera en CADA visita. Sin esto,
+ * Next.js podría congelarla al compilar y un producto agregado, editado o
+ * agotado desde el panel no se vería hasta el siguiente despliegue.
+ *
+ * generateMetadata (título y descripción SEO bilingües) no cambia.
  * ============================================================================
  */
 
@@ -27,9 +28,12 @@ import type { Metadata } from "next";
 import { getTranslations, getLocale } from "next-intl/server";
 import { CategoryPage } from "@/components/shop/CategoryPage";
 import { JsonLd } from "@/components/seo/JsonLd";
-import { getProductsByCategory } from "@/data/products";
+import { getProductsByCategory } from "@/lib/products-db";
 import { absoluteUrl, SITE_URL, SITE_NAME } from "@/lib/seo";
 import { breadcrumbSchema, itemListSchema } from "@/lib/jsonld";
+
+// Leer la base en cada visita (ver la cabecera).
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -47,7 +51,7 @@ export async function generateMetadata({
     namespace: "catalog",
   });
 
-  // Título y descripción de la categoría ARETES, traducidos según el idioma.
+  // Título y descripción de la categoría, traducidos según el idioma.
   const categoryTitle = tProduct("categories.Aretes");
   const metaDescription = tCatalog("metaDescriptions.Aretes");
 
@@ -58,10 +62,7 @@ export async function generateMetadata({
       canonical: absoluteUrl("/aretes"),
     },
     openGraph: {
-      /**
-       * SITE_NAME viene de lib/seo.ts (ya rebrandeado a "MKatalina"), así el
-       * nombre de marca se mantiene en un solo lugar.
-       */
+      // SITE_NAME viene de lib/seo.ts: el nombre de marca vive en un solo lugar.
       title: `${categoryTitle} · ${SITE_NAME}`,
       description: metaDescription,
       url: absoluteUrl("/aretes"),
@@ -80,8 +81,8 @@ export default async function AretesPage() {
     namespace: "breadcrumb",
   });
 
-  // Trae los 6 productos cuya categoría es "Aretes" (esta era la línea del bug).
-  const products = getProductsByCategory("Aretes");
+  // Productos visibles de "Aretes", leídos de la base (ahora es asíncrono).
+  const products = await getProductsByCategory("Aretes");
 
   const homeLabel = tBreadcrumb("home");
   const categoryTitle = tProduct("categories.Aretes");
@@ -100,7 +101,8 @@ export default async function AretesPage() {
       <JsonLd data={breadcrumbJsonLd} />
       <JsonLd data={itemListJsonLd} />
 
-      <CategoryPage category="Aretes" />
+      {/* Los productos viajan como prop: CategoryPage ya no los busca. */}
+      <CategoryPage category="Aretes" products={products} />
     </>
   );
 }

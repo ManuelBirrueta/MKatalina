@@ -1,22 +1,22 @@
 /**
  * ============================================================================
- * CART ITEM — KATALINA (Fase 12 Turno 3B.3: bilingüe)
+ * CART ITEM — MKATALINA (Fase 13 · Etapa 3D: límite de cantidad)
  * ============================================================================
  *
- * Cambios respecto a la versión anterior:
- *   - import Link cambia de "next/link" a "@/i18n/navigation"
- *     (mantiene el prefijo de idioma en URLs internas)
- *   - product.name se resuelve con getLocalized() porque ahora es LocalizedString
- *   - MATERIAL_LABELS y COLOR_LABELS reemplazados por t() del namespace product
- *   - Textos hardcoded ("Producto eliminado", "Deshacer", "Reducir cantidad",
- *     "c/u") ahora vienen de namespace cart
- *   - aria-labels usan interpolación con productName ya resuelto
+ * Un renglón del carrito: imagen, nombre, material · color, cantidad, precio
+ * y botón de eliminar (con "Deshacer").
  *
- * Lo que NO cambia:
- *   - cart-store.ts queda intacto (solo guarda slug + quantity)
- *   - useCart hook queda intacto (sigue devolviendo CartItemWithProduct)
- *   - La lógica del "Deshacer" toast queda intacta
- *   - El layout visual queda 100% idéntico
+ * CAMBIO DE LA ETAPA 3D — LÍMITE DE CANTIDAD:
+ *   - El "+" se detiene en item.maxQuantity (piezas disponibles).
+ *   - Si el renglón tiene MÁS piezas de las disponibles (alguien compró o
+ *     apartó mientras tanto), se avisa: "Solo quedan N" o "Agotado". El
+ *     cliente puede bajar la cantidad con "−" o quitar el producto; si
+ *     intentara pagar así, el servidor lo rechazaría sin cobrar.
+ *   Textos nuevos en el objeto COPY (es/en); los existentes siguen saliendo
+ *   de los namespaces "cart" y "product".
+ *
+ * Lo que NO cambia: diseño, enlaces con prefijo de idioma, nombre resuelto
+ * al idioma activo, labels traducidos de material y color, y el "Deshacer".
  * ============================================================================
  */
 
@@ -34,35 +34,38 @@ import { getLocalized } from "@/lib/i18n-helpers";
 import type { Locale } from "@/i18n/routing";
 import type { CartItemWithProduct } from "@/hooks/use-cart";
 
+/** Textos nuevos de la Etapa 3D (es/en). */
+const COPY = {
+  es: {
+    soldOut: "Agotado: quítalo para continuar con tu compra.",
+    onlyLeft: (n: number) =>
+      n === 1
+        ? "Solo queda 1 pieza disponible: ajusta la cantidad."
+        : `Solo quedan ${n} piezas disponibles: ajusta la cantidad.`,
+  },
+  en: {
+    soldOut: "Sold out: remove it to continue checking out.",
+    onlyLeft: (n: number) =>
+      n === 1
+        ? "Only 1 piece left: please adjust the quantity."
+        : `Only ${n} pieces left: please adjust the quantity.`,
+  },
+} as const;
+
 interface CartItemProps {
   item: CartItemWithProduct;
 }
 
-/**
- * NOTA: MATERIAL_LABELS y COLOR_LABELS ya NO existen como constantes.
- * Los labels se obtienen ahora con t() del namespace product.materials
- * y product.colors, que se traducen automáticamente al locale activo.
- */
-
 export function CartItem({ item }: CartItemProps) {
-  const { product, quantity, lineTotal } = item;
+  const { product, quantity, lineTotal, maxQuantity, exceedsStock } = item;
   const { updateQuantity, removeItem, addItem } = useCart();
 
-  /**
-   * Hooks de i18n:
-   *   - locale: idioma activo, para resolver product.name (LocalizedString)
-   *   - tProduct: traducciones del namespace "product" (materials, colors)
-   *   - tCart: traducciones del namespace "cart" (toasts, aria-labels)
-   */
   const locale = useLocale() as Locale;
   const tProduct = useTranslations("product");
   const tCart = useTranslations("cart");
+  const copy = locale === "en" ? COPY.en : COPY.es;
 
-  /**
-   * Resolver el nombre al locale activo.
-   * Lo hacemos UNA vez y reutilizamos en todos los lugares donde se usa
-   * (aria-labels, h3, toast description, etc.)
-   */
+  // Nombre resuelto al idioma activo (aria-labels, título, aviso).
   const productName = getLocalized(product.name, locale);
 
   const isPlaceholder =
@@ -72,15 +75,7 @@ export function CartItem({ item }: CartItemProps) {
     product.originalPrice !== undefined &&
     product.originalPrice > product.price;
 
-  /**
-   * handleRemove — elimina con opción de deshacer.
-   *
-   * Cambios:
-   *   - El texto del toast viene de tCart("toast.removed")
-   *   - La description del toast usa productName ya resuelto
-   *   - El label "Deshacer" viene de tCart("toast.undo")
-   *   - "Restaurado" viene de tCart("toast.restored")
-   */
+  /** Elimina el renglón con opción de deshacer (respeta el tope al restaurar). */
   const handleRemove = () => {
     const snapshot = { slug: product.slug, quantity };
 
@@ -106,7 +101,7 @@ export function CartItem({ item }: CartItemProps) {
   };
 
   const increment = () => {
-    if (quantity < 99) {
+    if (quantity < maxQuantity) {
       updateQuantity(product.slug, quantity + 1);
     }
   };
@@ -119,23 +114,14 @@ export function CartItem({ item }: CartItemProps) {
         className={cn(
           "flex-shrink-0 relative w-20 h-[100px]",
           "bg-secondary-subtle overflow-hidden",
-          "hover:opacity-80 transition-opacity"
+          "hover:opacity-80 transition-opacity",
         )}
         aria-label={tCart("item.viewDetails", { productName })}
       >
         {isPlaceholder ? (
           <div className="absolute inset-0 flex items-center justify-center">
+            {/* Placeholder visual mínimo: inicial de la categoría */}
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              {/*
-               * Primera letra de la categoría como placeholder.
-               * product.category es enum en español, pero solo usamos
-               * la primera letra. "A" para Aretes funciona en ambos
-               * idiomas porque también es "A" de "Aretes" en es
-               * y serviría para "E" en en — pero como product.category
-               * sigue siendo el enum en español, será "A".
-               *
-               * Esto es un placeholder visual mínimo, no es texto crítico.
-               */}
               {product.category[0]}
             </span>
           </div>
@@ -159,36 +145,33 @@ export function CartItem({ item }: CartItemProps) {
               href={product.href}
               className="hover:text-accent transition-colors"
             >
-              {/*
-               * Nombre del producto ya resuelto al locale.
-               */}
               <h3 className="font-display text-lg font-medium leading-tight">
                 {productName}
               </h3>
             </Link>
 
-            {/*
-             * Material · Color en línea pequeña debajo.
-             * Ambos traducidos vía namespace product.materials y product.colors.
-             */}
+            {/* Material · Color (traducidos) */}
             <p className="text-xs text-muted-foreground mt-1">
               {tProduct(`materials.${product.material}`)}
               {" · "}
               {tProduct(`colors.${product.color}`)}
             </p>
+
+            {/* Aviso: más piezas en el carrito de las que hay disponibles */}
+            {exceedsStock && (
+              <p className="text-xs font-medium text-destructive mt-1.5" role="alert">
+                {maxQuantity === 0 ? copy.soldOut : copy.onlyLeft(maxQuantity)}
+              </p>
+            )}
           </div>
 
-          {/*
-           * Botón eliminar.
-           * aria-label traducido con interpolación de productName.
-           */}
           <button
             onClick={handleRemove}
             aria-label={tCart("item.removeFromCart", { productName })}
             className={cn(
               "flex-shrink-0 p-1 -m-1",
               "text-muted-foreground hover:text-foreground",
-              "transition-colors cursor-pointer"
+              "transition-colors cursor-pointer",
             )}
           >
             <X className="h-4 w-4" />
@@ -197,16 +180,16 @@ export function CartItem({ item }: CartItemProps) {
 
         {/* Fila inferior: cantidad + precio */}
         <div className="flex items-end justify-between gap-3 mt-auto pt-2">
-          {/* Selector de cantidad */}
+          {/* Selector de cantidad (tope = piezas disponibles) */}
           <div className="inline-flex items-center border border-input rounded-md">
             <button
               onClick={decrement}
-              disabled={quantity === 1}
+              disabled={quantity <= 1}
               aria-label={tCart("item.decreaseQuantity")}
               className={cn(
                 "h-8 w-8 flex items-center justify-center",
                 "hover:bg-muted transition-colors",
-                "disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                "disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer",
               )}
             >
               <Minus className="h-3 w-3" />
@@ -221,12 +204,12 @@ export function CartItem({ item }: CartItemProps) {
 
             <button
               onClick={increment}
-              disabled={quantity === 99}
+              disabled={quantity >= maxQuantity}
               aria-label={tCart("item.increaseQuantity")}
               className={cn(
                 "h-8 w-8 flex items-center justify-center",
                 "hover:bg-muted transition-colors",
-                "disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                "disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer",
               )}
             >
               <Plus className="h-3 w-3" />
@@ -240,10 +223,6 @@ export function CartItem({ item }: CartItemProps) {
             </p>
             {quantity > 1 && (
               <p className="text-xs text-muted-foreground tabular-nums mt-0.5">
-                {/*
-                 * "{precio} c/u" en español → "{price} ea" en inglés
-                 * tCart("item.pricePerUnit") devuelve "c/u" / "ea".
-                 */}
                 {formatPrice(product.price)} {tCart("item.pricePerUnit")}
               </p>
             )}
